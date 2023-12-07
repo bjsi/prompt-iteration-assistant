@@ -15,3 +15,5 @@ A set of simple tools to speed up the prompt engineering iteration cycle.
 ## How to Use
 
 - `npm i prompt-iteration-assistant`
+
+## Examples

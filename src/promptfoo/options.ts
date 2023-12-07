@@ -1,9 +1,9 @@
 import { ChatCompletionMessageParam } from "openai/resources";
-import { OPENAI_CHAT_MODEL } from "../openai/chatModels";
+import { OPENAI_CHAT_MODEL, OPENAI_INSTRUCT_MODEL } from "../openai/models";
 
 export const plainTextTestOptions = (opts: {
   prompts: ChatCompletionMessageParam[][];
-  model: OPENAI_CHAT_MODEL;
+  model: OPENAI_CHAT_MODEL | OPENAI_INSTRUCT_MODEL;
 }) => {
   return {
     prompts: opts.prompts.map((p) => JSON.stringify(p)),
@@ -18,7 +18,7 @@ export const plainTextTestOptions = (opts: {
 export const functionCallTestOptions = (opts: {
   prompts: ChatCompletionMessageParam[][];
   functions?: any[];
-  model: OPENAI_CHAT_MODEL;
+  model: OPENAI_CHAT_MODEL | OPENAI_INSTRUCT_MODEL;
 }) => {
   return {
     prompts: opts.prompts.map((p) => JSON.stringify(p)),
