@@ -1,6 +1,6 @@
 # Prompt Iteration Assistant
 
-A set of simple tools to asccelerate the prompt engineering iteration cycle.
+A set of simple tools to accelerate the prompt engineering iteration cycle.
 
 ⚠️ Work in Progress ⚠️
 
