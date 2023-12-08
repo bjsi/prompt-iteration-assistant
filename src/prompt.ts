@@ -16,6 +16,18 @@ import { assertJSON, assertValidSchema } from "./promptfoo/assertions";
 import OpenAI from "openai";
 import { Stream } from "openai/streaming";
 import { chatMessagesToInstructPrompt } from "./openai/messages";
+import {
+  OpenAIChatMessage,
+  OpenAIChatModel,
+  OpenAICompletionModel,
+  StructureStreamPart,
+  ZodSchema,
+  generateStructure,
+  generateText,
+  openai,
+  streamStructure,
+  streamText,
+} from "modelfusion";
 
 dotenv.config();
 inquirer.registerPrompt("search-list", searchlist);
@@ -32,9 +44,9 @@ export type ExampleDataSet<T extends ZodType> = {
   };
 };
 
-export interface Action<Input, Output> {
+export interface Action<Output> {
   name: string;
-  action: (args: Input) => Promise<Output>;
+  action: () => Promise<Output>;
 }
 
 export interface CLIOptions<
@@ -46,12 +58,12 @@ export interface CLIOptions<
   getNextActions?: (
     prompt: Prompt<InputSchema, OutputSchema>,
     messages: ChatCompletionMessageParam[]
-  ) => Action<any, any>[];
+  ) => Action<any>[];
 }
 
 export class Prompt<
   InputSchema extends ZodObject<any>,
-  OutputSchema extends ZodType = ZodType<string | null>
+  OutputSchema extends ZodType | undefined = undefined
 > {
   name: string;
   description?: string;
@@ -165,13 +177,13 @@ export class Prompt<
       const examples = this.exampleData.filter((set) => Boolean(set[key]));
       const formatKey = () =>
         (this.cliOptions?.inputKeyToCLIPrompt?.(key) || key.toString()) +
-        (this.input.shape[key].optional ? " (optional)" : "");
+        (this.input.shape[key].isOptional() ? " (optional)" : "");
       if (examples.length) {
         const answer = await inquirer.prompt([
           {
             type: "search-list",
             name: key,
-            message: formatKey(),
+            message: "Enter values for prompt variables",
             choices: [
               "input",
               ...examples
@@ -214,16 +226,21 @@ export class Prompt<
         this,
         this.prompts[0].compile(args)
       );
-      const nextAction = await inquirer.prompt([
+      const nextActionName = await inquirer.prompt([
         {
           type: "search-list",
           name: "action",
           message: "Select an option:",
-          choices: nextActions || ["run"],
+          choices: (nextActions || [])?.map((x) => x.name) || ["run"],
         },
       ]);
-      if (nextAction) {
-        await nextAction.run();
+      if (nextActionName) {
+        const nextAction = nextActions?.find(
+          (x) => x.name === nextActionName.action
+        );
+        if (nextAction) {
+          await nextAction.action();
+        }
       }
     }
   };
@@ -312,27 +329,20 @@ export class Prompt<
     stream: true;
     verbose?: boolean;
   }): Promise<
-    Stream<
-      OutputSchema extends ZodType<infer U> ? U : ChatCompletionMessageParam
-    >
+    OutputSchema extends ZodType<infer U>
+      ? AsyncIterable<StructureStreamPart<U>>
+      : AsyncIterable<string>
   >;
   async run(args: {
     promptVariables: z.infer<InputSchema>;
     stream: false;
     verbose?: boolean;
-  }): Promise<
-    OutputSchema extends ZodType<infer U> ? U : ChatCompletionMessageParam
-  >;
+  }): Promise<OutputSchema extends ZodType<infer U> ? U : string | null>;
   async run(args: {
     promptVariables: z.infer<InputSchema>;
     stream: boolean;
     verbose?: boolean;
-  }): Promise<
-    | (OutputSchema extends ZodType<infer U> ? U : string | null)
-    | Stream<
-        OutputSchema extends ZodType<infer U> ? U : ChatCompletionMessageParam
-      >
-  > {
+  }): Promise<any> {
     const promptVars = this.input.parse(args.promptVariables);
     const messages = this.prompts[0]
       .compile(promptVars)
@@ -345,50 +355,61 @@ export class Prompt<
         console.log(messages);
       }
     }
-    const response =
-      this.model === "gpt-3.5-turbo-instruct"
-        ? await new OpenAI().completions.create({
-            prompt: chatMessagesToInstructPrompt(messages),
-            model: this.model,
-            temperature: this.temperature,
-            max_tokens: this.max_tokens,
-          })
-        : await new OpenAI().chat.completions.create({
-            messages,
-            model: this.model,
-            function_call: this.output ? { name: this.name } : undefined,
-            functions: this.output
-              ? [
-                  {
-                    name: this.name,
-                    description: this.description,
-                    parameters: zodToJsonSchema(this.output),
-                  },
-                ]
-              : undefined,
-            stream: args.stream,
-          });
-    if (response instanceof Stream) {
-      if (this.output) {
-        throw new Error("Not Implemented Yet");
-      } else {
-        throw new Error("Not Implemented Yet");
-      }
-    } else if (response.object === "text_completion") {
-      if (args.verbose) console.log(response.choices[0]);
-      return response.choices[0].text as any;
-    } else {
-      if (args.verbose) console.log(response.choices[0].message);
-      if (this.output) {
-        const args = JSON.parse(
-          response.choices[0].message.function_call?.arguments || "{}"
+
+    if (!this.output || this.model === "gpt-3.5-turbo-instruct") {
+      const config =
+        this.model === "gpt-3.5-turbo-instruct"
+          ? openai.CompletionTextGenerator({
+              model: "gpt-3.5-turbo-instruct",
+              temperature: this.temperature,
+              maxCompletionTokens: this.max_tokens,
+            })
+          : openai.ChatTextGenerator({
+              model: this.model,
+              temperature: this.temperature,
+              maxCompletionTokens: this.max_tokens,
+            });
+      if (args.stream) {
+        const stream = await streamText(
+          config as any,
+          config instanceof OpenAICompletionModel
+            ? chatMessagesToInstructPrompt(messages)
+            : messages
         );
-        const parsed = this.output.safeParse(args);
-        return parsed.success
-          ? parsed.data
-          : this.run({ ...args, retries: (args.retries || 0) + 1 });
+        return stream;
       } else {
-        return response.choices[0].message as any;
+        const text = await generateText(
+          config as any,
+          config instanceof OpenAICompletionModel
+            ? chatMessagesToInstructPrompt(messages)
+            : messages
+        );
+        return text;
+      }
+    } else {
+      const config = openai
+        .ChatTextGenerator({
+          model: this.model,
+          temperature: this.temperature,
+          maxCompletionTokens: this.max_tokens,
+        })
+        .asFunctionCallStructureGenerationModel({
+          fnName: this.name,
+          fnDescription: this.description,
+        });
+      if (args.stream) {
+        const stream = await streamStructure(
+          config,
+          new ZodSchema(this.output),
+          messages as OpenAIChatMessage[]
+        );
+        return stream;
+      } else {
+        return await generateStructure(
+          config,
+          new ZodSchema(this.output),
+          messages as OpenAIChatMessage[]
+        );
       }
     }
   }

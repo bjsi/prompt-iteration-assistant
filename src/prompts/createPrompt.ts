@@ -1,8 +1,10 @@
 import { z } from "zod";
-import { Prompt } from "../prompt";
+import { Action, Prompt } from "../prompt";
 import { ChatMessage } from "../openai/messages";
 import inquirer from "inquirer";
-import _ from "remeda";
+import * as _ from "remeda";
+import { chat, edit } from "./actions";
+import { openai, streamText } from "modelfusion";
 
 const createPrompt = new Prompt({
   name: "createPrompt",
@@ -14,39 +16,7 @@ const createPrompt = new Prompt({
   model: "gpt-4",
   cliOptions: {
     getNextActions: (prompt, messages) => {
-      // while (answer?.action !== "Exit") {
-      //   answer = await inquirer.prompt([
-      //     {
-      //       type: "search-list",
-      //       name: "action",
-      //       message: "Select an option:",
-      //       choices: ["Edit", "Chat", "Exit"],
-      //     },
-      //   ]);
-      //   if (answer.action === "Edit") {
-      //     const x = await inquirer.prompt([
-      //       {
-      //         type: "editor",
-      //         default: output,
-      //         name: "Edit",
-      //       },
-      //     ]);
-      //   } else if (answer.action === "Chat") {
-      //     const x = await inquirer.prompt([
-      //       {
-      //         type: "input",
-      //         name: "Next Message",
-      //       },
-      //     ]);
-      //     if (x["Next Message"]) {
-      //       this.extraMessages.push({
-      //         role: "user",
-      //         content: x["Next Message"],
-      //       });
-      //     }
-      //   }
-      // }
-      return [
+      const actions: Action<any>[] = [
         {
           name: "run",
           action: async () => {
@@ -59,20 +29,39 @@ const createPrompt = new Prompt({
               },
             ]);
             const n = Math.max(Math.min(parseInt(answer.n_times), 0), 5);
-            // TODO: need a generic callApi fn for this
-            // const results = await Promise.all(
-            //   _.range(0, n).map(async () => {
-            //     prompt.run({});
-            //   })
-            // );
+
+            // need to push tokens into string array and console.clear(), console.log() them
+
+            const results = await Promise.all(
+              _.range(0, n).map(async () => {
+                const stream = await streamText(
+                  openai.ChatTextGenerator({
+                    model: "gpt-4",
+                    // temperature: this.temperature,
+                    // maxCompletionTokens: this.max_tokens,
+                  }),
+                  [
+                    ChatMessage.system(
+                      messages[messages.length - 1].content as string
+                    ),
+                  ]
+                );
+                let fullText = "";
+                for await (const message of stream) {
+                  process.stdout.write(message);
+                  fullText += message;
+                }
+                return fullText;
+              })
+            );
+            console.log(results);
           },
-        }, // times: default 1
-        {type: "edit",
-        "chat",
-        "save",
-        { type: "prompt", name: "input schema" },
-        "output schema",
+        },
+        edit({ input: messages }),
+        chat({ input: messages }),
+        { name: "save", async action() {} },
       ];
+      return actions;
     },
     inputKeyToCLIPrompt(key) {
       if (key === "goal") {

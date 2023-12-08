@@ -67,14 +67,34 @@ export const chatMessagesToInstructPrompt = (
   return messages
     .map((m) => {
       if (m.role === "system") {
-        return m.content;
+        return `# System\n${m.content}`;
       } else if (m.role === "user") {
-        return `${m.content}`;
+        return `# User\n${m.content}`;
       } else if (m.role === "assistant") {
-        return `${m.content}`;
-      } else if (m.role === "function") {
-        return `${m.content}`;
+        return `# Assistant\n${m.content}\n${JSON.stringify(
+          m.function_call,
+          null,
+          2
+        )}`;
       }
     })
     .join("\n\n");
+};
+
+export const instructPromptToChatMessages = (
+  prompt: string
+): ChatCompletionMessageParam[] => {
+  const messages = prompt.split("\n\n");
+  return messages.map((message) => {
+    const lines = message.split("\n");
+    const role = lines[0].replace("# ", "") as "System" | "User" | "Assistant";
+    const content = lines.slice(1).join("\n");
+    if (role === "System") {
+      return ChatMessage.system(content);
+    } else if (role === "User") {
+      return ChatMessage.user(content);
+    } else if (role === "Assistant") {
+      return ChatMessage.assistant(content);
+    }
+  });
 };
