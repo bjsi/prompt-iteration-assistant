@@ -20,8 +20,6 @@ import { chatMessagesToInstructPrompt } from "./openai/messages";
 dotenv.config();
 inquirer.registerPrompt("search-list", searchlist);
 
-const MAX_RETRIES = 3;
-
 export type CandidatePrompt<Args> = {
   compile: (args: Args) => ChatCompletionMessageParam[];
   name: string;
@@ -33,6 +31,23 @@ export type ExampleDataSet<T extends ZodType> = {
     value: z.infer<T>[key];
   };
 };
+
+export interface Action<Input, Output> {
+  name: string;
+  action: (args: Input) => Promise<Output>;
+}
+
+export interface CLIOptions<
+  InputSchema extends ZodObject<any>,
+  OutputSchema extends ZodType = ZodType<string | null>
+> {
+  formatChatMessage?: (message: ChatCompletionMessageParam) => any;
+  inputKeyToCLIPrompt?: (key: keyof z.infer<InputSchema>) => string;
+  getNextActions?: (
+    prompt: Prompt<InputSchema, OutputSchema>,
+    messages: ChatCompletionMessageParam[]
+  ) => Action<any, any>[];
+}
 
 export class Prompt<
   InputSchema extends ZodObject<any>,
@@ -51,17 +66,25 @@ export class Prompt<
   model: OPENAI_CHAT_MODEL | OPENAI_INSTRUCT_MODEL;
   input: InputSchema;
   output?: OutputSchema;
+  cliOptions?: CLIOptions<InputSchema>;
 
+  temperature?: number;
+  max_tokens?: number;
+
+  private extraMessages: ChatCompletionMessageParam[] = [];
   private tests: promptfoo.EvaluateTestSuite[] = [];
 
   constructor(args: {
     name: string;
     description?: string;
     model: OPENAI_CHAT_MODEL | OPENAI_INSTRUCT_MODEL;
+    temperature?: number;
+    max_tokens?: number;
     prompts: CandidatePrompt<z.infer<InputSchema>>[];
     input: InputSchema;
     output?: OutputSchema;
     exampleData?: ExampleDataSet<InputSchema>[];
+    cliOptions?: CLIOptions<InputSchema>;
   }) {
     this.name = args.name;
     this.output = args.output;
@@ -70,6 +93,7 @@ export class Prompt<
     this.input = args.input;
     this.model = args.model;
     this.exampleData = args.exampleData || [];
+    this.cliOptions = args.cliOptions;
   }
 
   withTest = (
@@ -127,36 +151,41 @@ export class Prompt<
     return this;
   };
 
+  /**
+   * Each `Prompt` contains its own `nextAction` handlers, but all of them require
+   * filling out the `input` schema first, so this method fills out the input schema
+   * before calling the `nextAction` handler.
+   */
   private runLoop = async () => {
     const keys = Object.keys(
       this.input.shape
     ) as (keyof z.infer<InputSchema>)[];
     const args: z.infer<InputSchema> = {};
-    console.log("keys", keys);
     for (const key of keys) {
       const examples = this.exampleData.filter((set) => Boolean(set[key]));
-      console.log("exampleData", this.exampleData);
-      console.log("examples", examples);
+      const formatKey = () =>
+        (this.cliOptions?.inputKeyToCLIPrompt?.(key) || key.toString()) +
+        (this.input.shape[key].optional ? " (optional)" : "");
       if (examples.length) {
         const answer = await inquirer.prompt([
           {
             type: "search-list",
             name: key,
-            message: key,
+            message: formatKey(),
             choices: [
-              "Input",
+              "input",
               ...examples
                 .map((d) => Object.values(d).map((d) => d.name))
                 .flat(),
             ],
           },
         ]);
-        if (answer[key] === "Input") {
+        if (answer[key] === "input") {
           const answer = await inquirer.prompt([
             {
               type: "input",
               name: key,
-              message: key,
+              message: formatKey(),
             },
           ]);
           args[key] = answer[key];
@@ -171,35 +200,31 @@ export class Prompt<
           {
             type: "input",
             name: key,
-            message: key,
+            message: formatKey(),
           },
         ]);
         args[key] = answer[key];
       }
     }
-    const output = await this.run({
-      promptVariables: args,
-      verbose: true,
-      stream: false,
-    });
 
-    const answer = await inquirer.prompt([
-      {
-        type: "search-list",
-        name: "action",
-        message: "Select an option:",
-        choices: ["Edit", "Exit"],
-      },
-    ]);
-
-    if (answer.action === "Edit") {
-      const x = await inquirer.prompt([
+    // at this point, we have all the input variables
+    while (true) {
+      // get the list of nextActions from the prompt's cliOptions or provide default options
+      const nextActions = this.cliOptions?.getNextActions?.(
+        this,
+        this.prompts[0].compile(args)
+      );
+      const nextAction = await inquirer.prompt([
         {
-          type: "editor",
-          default: output,
-          name: "Edit",
+          type: "search-list",
+          name: "action",
+          message: "Select an option:",
+          choices: nextActions || ["run"],
         },
       ]);
+      if (nextAction) {
+        await nextAction.run();
+      }
     }
   };
 
@@ -222,17 +247,17 @@ export class Prompt<
     });
     if (Object.keys(opts).length === 0) {
       // Use Inquirer.js to display a selection menu
-      const answers = await inquirer.prompt([
+      const answer = await inquirer.prompt<{ action: "run" | "test" }>([
         {
           type: "search-list",
           name: "action",
           message: "Select an option:",
-          choices: ["Run", "Test", "Open WebUI"],
+          choices: ["run", "test"],
         },
       ]);
 
       // Handle the selected option
-      if (answers.action === "Test") {
+      if (answer.action === "test") {
         const test = await inquirer.prompt([
           {
             type: "search-list",
@@ -246,9 +271,7 @@ export class Prompt<
         } else {
           await this.test(test.test);
         }
-      } else if (answers.action === "Open WebUI") {
-        // Implement the logic to open the WebUI
-      } else if (answers.action === "Run") {
+      } else if (answer.action === "run") {
         this.runLoop();
       }
     }
@@ -289,24 +312,33 @@ export class Prompt<
     stream: true;
     verbose?: boolean;
   }): Promise<
-    Stream<OutputSchema extends ZodType<infer U> ? U : string | null>
+    Stream<
+      OutputSchema extends ZodType<infer U> ? U : ChatCompletionMessageParam
+    >
   >;
   async run(args: {
     promptVariables: z.infer<InputSchema>;
     stream: false;
     verbose?: boolean;
-  }): Promise<OutputSchema extends ZodType<infer U> ? U : string | null>;
+  }): Promise<
+    OutputSchema extends ZodType<infer U> ? U : ChatCompletionMessageParam
+  >;
   async run(args: {
     promptVariables: z.infer<InputSchema>;
     stream: boolean;
     verbose?: boolean;
   }): Promise<
     | (OutputSchema extends ZodType<infer U> ? U : string | null)
-    | Stream<OutputSchema extends ZodType<infer U> ? U : string | null>
+    | Stream<
+        OutputSchema extends ZodType<infer U> ? U : ChatCompletionMessageParam
+      >
   > {
     const promptVars = this.input.parse(args.promptVariables);
-    const messages = this.prompts[0].compile(promptVars);
+    const messages = this.prompts[0]
+      .compile(promptVars)
+      .concat(this.extraMessages);
     if (args.verbose) {
+      console.log("model:", this.model);
       if (this.model === "gpt-3.5-turbo-instruct") {
         console.log(chatMessagesToInstructPrompt(messages));
       } else {
@@ -318,6 +350,8 @@ export class Prompt<
         ? await new OpenAI().completions.create({
             prompt: chatMessagesToInstructPrompt(messages),
             model: this.model,
+            temperature: this.temperature,
+            max_tokens: this.max_tokens,
           })
         : await new OpenAI().chat.completions.create({
             messages,
@@ -344,7 +378,7 @@ export class Prompt<
       if (args.verbose) console.log(response.choices[0]);
       return response.choices[0].text as any;
     } else {
-      if (args.verbose) console.log(response.choices[0]);
+      if (args.verbose) console.log(response.choices[0].message);
       if (this.output) {
         const args = JSON.parse(
           response.choices[0].message.function_call?.arguments || "{}"
@@ -354,7 +388,7 @@ export class Prompt<
           ? parsed.data
           : this.run({ ...args, retries: (args.retries || 0) + 1 });
       } else {
-        return response.choices[0].message.content as any;
+        return response.choices[0].message as any;
       }
     }
   }
