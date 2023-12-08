@@ -1,6 +1,6 @@
 # Prompt Iteration Assistant
 
-A set of simple tools to speed up the prompt engineering iteration cycle.
+A set of simple tools to accelerate the prompt engineering iteration cycle.
 
 ⚠️ Work in Progress ⚠️
 
@@ -11,6 +11,12 @@ A set of simple tools to speed up the prompt engineering iteration cycle.
 - Easily register prompts as CLI scripts.
 - CLI interface to quickly run tests or try out a prompt with new input.
 - [zod](https://zod.dev/) integration for runtime type safety.
+- built in dialogs and prompts to help with the entire prompt engineering pipeline 
+  - creating prompt instructions
+  - creating in-context examples
+  - elaborating on examples
+  - quickly running artbitrary prompts inside the prompt your are editing
+- no janky, unpolished UI, just good old fashioned CLI tools
 
 ## How to Use
 
