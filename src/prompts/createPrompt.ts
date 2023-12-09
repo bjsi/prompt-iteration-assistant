@@ -248,8 +248,9 @@ export const ${toCamelCase(name)} = new Prompt<
 if (require.main === module) {
   ${toCamelCase(name)}.runCLI();
 }`;
-            await sleep(10_000);
+            console.log("Saving to prompt.ts");
             console.log(highlight(code, { language: "ts" }));
+            await sleep(2000);
             writeFileSync("prompt.ts", code);
           },
         },
