@@ -1,5 +1,0 @@
-- Construct a Zod schema based on the text input.
-- The variables use the following syntax: `${variableName}`.
-- For each variable in the prompt, create a corresponding key in the schema
-- Translate each prompt variable into respective Zod schema data types and structure.
-- Your replies should begin `const schema = Zod.object({`

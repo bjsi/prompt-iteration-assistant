@@ -12,6 +12,7 @@ import { toCamelCase } from "../helpers/stringUtils";
 import highlight from "cli-highlight";
 import { sleep } from "openai/core";
 import { writeFileSync } from "fs";
+import { createInputSchema } from "./createInputSchema";
 
 const input = z.object({
   goal: z.string(),
@@ -48,6 +49,27 @@ export const createPrompt = new Prompt<
           messages: [ChatMessage.assistant(prompt.state.currentPrompt)],
         });
       }
+
+      const updateCurrentPrompt = async (newPrompt: string) => {
+        prompt.state.currentPrompt = newPrompt;
+        if (
+          !newPrompt.includes("${") ||
+          newPrompt === prompt.state.currentPrompt
+        ) {
+          return;
+        }
+        // todo: optimize by only running this if the variables have changed
+        const inputSchema = await createInputSchema.run({
+          promptVariables: {
+            text: newPrompt,
+          },
+          stream: false,
+        });
+        if (inputSchema) {
+          prompt.state.inputSchema = inputSchema;
+        }
+      };
+
       const actions: Action<any>[] = [
         {
           name: "create prompt",
@@ -81,7 +103,7 @@ export const createPrompt = new Prompt<
             if (!Array.isArray(results) || results.length === 0) {
               return;
             } else if (results.length === 1) {
-              prompt.state.currentPrompt = results[0];
+              await updateCurrentPrompt(results[0]);
             } else if (results.length > 1) {
               // pick which result to use
               const choices = [
@@ -107,7 +129,7 @@ export const createPrompt = new Prompt<
               } else {
                 const idx = parseInt(favorite);
                 const result = results[idx] as string;
-                prompt.state.currentPrompt = result;
+                updateCurrentPrompt(result);
               }
             }
           },
@@ -153,7 +175,10 @@ export const createPrompt = new Prompt<
         edit({
           input: prompt.state.currentPrompt || "",
           onSaved: (updatedPrompt) => {
-            prompt.state.currentPrompt = updatedPrompt;
+            if (!updatedPrompt) {
+              return;
+            }
+            updateCurrentPrompt(updatedPrompt);
           },
         }),
         {
@@ -190,15 +215,6 @@ export const createPrompt = new Prompt<
           },
         },
         {
-          name: "input schema",
-          enabled: () => !!prompt.state.currentPrompt,
-          action: async () => {
-            const schemaPrompt = createSchema("input");
-            await schemaPrompt.runCLI("run");
-            prompt.state.inputSchema = schemaPrompt.state.schema;
-          },
-        },
-        {
           name: "output schema",
           enabled: () => !!prompt.state.currentPrompt,
           action: async () => {
@@ -222,7 +238,7 @@ ${prompt.state.inputSchema || ""}
 
 ${prompt.state.outputSchema || ""}
 
-interface ${toCamelCase(name)}State { }
+interface ${name.replace(/ /g, "")}State { }
 
 export const ${toCamelCase(name)} = new Prompt<
   typeof input,
@@ -281,7 +297,7 @@ if (require.main === module) {
           `
 - You are a ChatGPT prompt engineer helping a user create a ChatGPT system instructions prompt.
 - Your role is to write a ChatGPT system instructions prompt to achieve the user's goal.
-- Create very concise system prompt instructions for ChatGPT tailored to the user's specific needs.
+- Create a very concise system prompt instructions for ChatGPT tailored to the user's specific needs.
 - Don't include examples in the prompt.
 - If the prompt requires input variables, use the following format: \${variableName}.
 - Format the prompt using markdown.
