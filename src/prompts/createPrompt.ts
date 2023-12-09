@@ -3,23 +3,96 @@ import { Action, Prompt } from "../prompt";
 import { ChatMessage } from "../openai/messages";
 import inquirer from "inquirer";
 import * as _ from "remeda";
-import { chat, edit } from "./actions";
-import { openai, streamText } from "modelfusion";
+import { edit } from "./actions";
+import { ChatCompletionMessageParam } from "openai/resources";
+import { printChatMessages, printMarkdown } from "../helpers/printUtils";
+import { runConcurrent } from "../openai/runConcurrent";
+import { createSchema } from "./createSchema";
 
-const createPrompt = new Prompt({
-  name: "createPrompt",
-  description: "Create a new prompt",
-  input: z.object({
-    goal: z.string(),
-    idealOutput: z.string().optional(),
-  }),
+const input = z.object({
+  goal: z.string(),
+  idealOutput: z.string().optional(),
+});
+
+interface CreatePromptState {
+  currentPrompt?: string;
+  feedback?: ChatCompletionMessageParam[];
+  inputSchema?: string;
+  outputSchema?: string;
+}
+
+/**
+ * This is a prompt which uses ChatGPT to help you create a ChatGPT prompt. It's a bit meta :)
+ */
+export const createPrompt = new Prompt<
+  typeof input,
+  undefined,
+  CreatePromptState
+>({
+  state: {},
+  name: "Create Prompt",
+  description: "Create a ChatGPT prompt to solve the user's task",
+  input,
   model: "gpt-4",
   cliOptions: {
-    getNextActions: (prompt, messages) => {
+    getNextActions: (prompt, initialMessages) => {
+      console.clear();
+      printChatMessages({ messages: initialMessages, hideSystem: true });
+      if (prompt.state.currentPrompt) {
+        printChatMessages({
+          messages: [ChatMessage.assistant(prompt.state.currentPrompt)],
+        });
+      }
       const actions: Action<any>[] = [
         {
-          name: "run",
+          name: "create prompt",
           action: async () => {
+            const controller = new AbortController();
+            const results = await Promise.race([
+              inquirer.prompt([
+                {
+                  type: "confirm",
+                  name: "cancel",
+                  message: `Stop Generation`,
+                },
+              ]),
+              (() => {
+                console.log();
+                return runConcurrent(initialMessages, 1, controller.signal);
+              })(),
+            ]);
+            controller.abort();
+            if (!Array.isArray(results) || results.length === 0) {
+              return;
+            } else if (results.length === 1) {
+              prompt.state.currentPrompt = results[0];
+            } else if (results.length > 1) {
+              // pick which result to use
+              const { favorite } = await inquirer.prompt([
+                {
+                  type: "list",
+                  name: "favorite",
+                  message: "Which prompt is your favorite?",
+                  choices: results.map((_, i) => ({
+                    name: `Result #${i + 1}`,
+                    value: i,
+                  })),
+                },
+              ]);
+              const result = results[parseInt(favorite)] as string;
+              prompt.state.currentPrompt = result;
+            }
+          },
+        },
+        {
+          name: "test prompt",
+          enabled: () => !!prompt.state.currentPrompt,
+          action: async () => {
+            if (!prompt.state.currentPrompt) {
+              return;
+            }
+            // get inputs
+
             const answer = await inquirer.prompt([
               {
                 type: "number",
@@ -28,46 +101,99 @@ const createPrompt = new Prompt({
                 default: 1,
               },
             ]);
-            const n = Math.max(Math.min(parseInt(answer.n_times), 0), 5);
 
-            // need to push tokens into string array and console.clear(), console.log() them
-
-            const results = await Promise.all(
-              _.range(0, n).map(async () => {
-                const stream = await streamText(
-                  openai.ChatTextGenerator({
-                    model: "gpt-4",
-                    // temperature: this.temperature,
-                    // maxCompletionTokens: this.max_tokens,
-                  }),
-                  [
-                    ChatMessage.system(
-                      messages[messages.length - 1].content as string
-                    ),
-                  ]
-                );
-                let fullText = "";
-                for await (const message of stream) {
-                  process.stdout.write(message);
-                  fullText += message;
-                }
-                return fullText;
-              })
-            );
+            const numCalls = Math.min(Math.max(parseInt(answer.n_times), 0), 5);
+            const controller = new AbortController();
+            const results = await Promise.race([
+              inquirer.prompt([
+                {
+                  type: "confirm",
+                  name: "cancel",
+                  message: `Stop Generation?`,
+                },
+              ]),
+              runConcurrent(
+                // todo: compile prompt
+                [ChatMessage.user(prompt.state.currentPrompt!)],
+                numCalls
+              ),
+            ]);
+            controller.abort();
             console.log(results);
           },
         },
-        edit({ input: messages }),
-        chat({ input: messages }),
+        edit({
+          input: prompt.state.currentPrompt || "",
+          onSaved: (updatedPrompt) => {
+            prompt.state.currentPrompt = updatedPrompt;
+          },
+        }),
+        {
+          name: "feedback",
+          enabled: () => !!prompt.state.currentPrompt,
+          async action() {
+            if (!prompt.state.currentPrompt) {
+              return;
+            }
+            const answer = await inquirer.prompt([
+              {
+                type: "input",
+                name: "feedback",
+                message: "Feedback for the prompt engineer:",
+              },
+            ]);
+            const messages: ChatCompletionMessageParam[] = [
+              ...initialMessages,
+              ChatMessage.assistant(prompt.state.currentPrompt!),
+              ChatMessage.user(answer.feedback),
+            ];
+            const response = await runConcurrent(messages, 1);
+            const revisedPrompt = response[0];
+            const confirm = await inquirer.prompt([
+              {
+                type: "confirm",
+                name: "confirm",
+                message: "Keep the revised prompt?",
+              },
+            ]);
+            if (confirm.confirm) {
+              prompt.state.currentPrompt = revisedPrompt;
+            }
+          },
+        },
+        {
+          name: "input schema",
+          enabled: () => !!prompt.state.currentPrompt,
+          action: async () => {
+            const schemaPrompt = createSchema("input");
+            await schemaPrompt.runCLI("run");
+            prompt.state.inputSchema = schemaPrompt.state.schema;
+          },
+        },
+        {
+          name: "output schema",
+          enabled: () => !!prompt.state.currentPrompt,
+          action: async () => {
+            const schemaPrompt = createSchema("output");
+            await schemaPrompt.runCLI("run");
+            prompt.state.inputSchema = schemaPrompt.state.schema;
+          },
+        },
         { name: "save", async action() {} },
-      ];
+        {
+          name: "quit",
+          async action() {
+            process.exit(0);
+          },
+        },
+      ].filter((a) => a.enabled?.() ?? true);
       return actions;
     },
     inputKeyToCLIPrompt(key) {
       if (key === "goal") {
-        return "What is the goal of the prompt?";
+        return "Goal of the prompt:";
       } else if (key === "idealOutput") {
-        return "What is the ideal output of the prompt?";
+        return "Ideal output:";
       } else {
         return key;
       }
@@ -75,29 +201,21 @@ const createPrompt = new Prompt({
   },
   prompts: [
     {
-      // adapted from https://www.reddit.com/r/PromptEngineering/comments/12a5j34/iterative_prompt_creator/
-      name: "reddit",
+      name: "sr-prompt-engineer",
       compile: (vars) => [
         ChatMessage.system(
           `
-# Instructions
-- Act as a senior prompt engineer
-- Task context: prompt generation, iteration<->(feedback and collaboration) to create a clear, concise, unbounded prompt tailored to meet specific needs.
-- Your role is to provide guidance and expertise.
-- Format the prompts using markdown
-- Start simple by coming up with bullet-list prompt instructions without examples.
+- You are a ChatGPT prompt engineer helping a user create a ChatGPT system instructions prompt.
+- Your role is to write a ChatGPT system instructions prompt to achieve the user's goal.
+- Create very concise system prompt instructions for ChatGPT tailored to the user's specific needs.
+- Don't include examples in the prompt.
+- If the prompt requires input variables, use the following format: \${variableName}.
+- Format the prompt using markdown.
 `.trim()
         ),
         ChatMessage.user(
           `
-# Goal
-${vars.goal}
-${
-  vars.idealOutput
-    ? `# Ideal output
-${vars.idealOutput}`
-    : ""
-} 
+The goal of the prompt is ${vars.goal}.
 `.trim()
         ),
       ],
@@ -106,7 +224,7 @@ ${vars.idealOutput}`
   exampleData: [
     {
       goal: {
-        name: "notes->flashcards",
+        name: "notes to flashcards",
         value: "To generate flashcards for me from my notes",
       },
     },
@@ -118,5 +236,6 @@ createPrompt.withTest("flashcard assistant", {
 });
 
 if (require.main === module) {
-  createPrompt.runCLI();
+  const mode = process.argv[2];
+  createPrompt.runCLI(mode as any);
 }

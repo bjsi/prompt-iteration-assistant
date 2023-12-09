@@ -1,4 +1,4 @@
-import { ChatCompletionMessageParam } from "openai/resources";
+import { Chat, ChatCompletionMessageParam } from "openai/resources";
 
 import { z, ZodType } from "zod";
 
@@ -81,20 +81,31 @@ export const chatMessagesToInstructPrompt = (
     .join("\n\n");
 };
 
-export const instructPromptToChatMessages = (
-  prompt: string
-): ChatCompletionMessageParam[] => {
-  const messages = prompt.split("\n\n");
-  return messages.map((message) => {
-    const lines = message.split("\n");
-    const role = lines[0].replace("# ", "") as "System" | "User" | "Assistant";
-    const content = lines.slice(1).join("\n");
-    if (role === "System") {
-      return ChatMessage.system(content);
-    } else if (role === "User") {
-      return ChatMessage.user(content);
-    } else if (role === "Assistant") {
-      return ChatMessage.assistant(content);
+export const instructPromptToChatMessages = (prompt: string) => {
+  const lines = prompt.split("\n");
+  const messages = [];
+  let currentRole: ChatMessage["role"] | null = null;
+  let content: string[] = [];
+
+  lines.forEach((line) => {
+    if (line.match(/^# (System|User|Assistant)/)) {
+      if (currentRole && content.length > 0) {
+        messages.push(createChatMessage(currentRole, content.join("\n")));
+      }
+      currentRole = line.replace("# ", "").toLowerCase() as ChatMessage["role"];
+      content = [];
+    } else {
+      content.push(line);
     }
   });
+
+  if (currentRole && content.length > 0) {
+    messages.push(createChatMessage(currentRole, content.join("\n")));
+  }
+
+  return messages;
+};
+
+const createChatMessage = (role: ChatMessage["role"], content: string) => {
+  return ChatMessage[role](content);
 };

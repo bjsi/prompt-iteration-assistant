@@ -13,12 +13,9 @@ import {
   plainTextTestOptions,
 } from "./promptfoo/options";
 import { assertJSON, assertValidSchema } from "./promptfoo/assertions";
-import OpenAI from "openai";
-import { Stream } from "openai/streaming";
 import { chatMessagesToInstructPrompt } from "./openai/messages";
 import {
   OpenAIChatMessage,
-  OpenAIChatModel,
   OpenAICompletionModel,
   StructureStreamPart,
   ZodSchema,
@@ -28,6 +25,11 @@ import {
   streamStructure,
   streamText,
 } from "modelfusion";
+import * as _ from "remeda";
+import { toCamelCase, truncate } from "./helpers/stringUtils";
+import { printZodSchema } from "./helpers/printUtils";
+import { edit } from "./prompts/actions";
+import chalk from "chalk";
 
 dotenv.config();
 inquirer.registerPrompt("search-list", searchlist);
@@ -47,29 +49,85 @@ export type ExampleDataSet<T extends ZodType> = {
 export interface Action<Output> {
   name: string;
   action: () => Promise<Output>;
+  enabled?: () => boolean;
 }
 
 export interface CLIOptions<
   InputSchema extends ZodObject<any>,
-  OutputSchema extends ZodType = ZodType<string | null>
+  OutputSchema extends ZodType | undefined = undefined,
+  State extends {} = Record<string, any>
 > {
   formatChatMessage?: (message: ChatCompletionMessageParam) => any;
   inputKeyToCLIPrompt?: (key: keyof z.infer<InputSchema>) => string;
   getNextActions?: (
-    prompt: Prompt<InputSchema, OutputSchema>,
+    prompt: Prompt<InputSchema, OutputSchema, State>,
     messages: ChatCompletionMessageParam[]
   ) => Action<any>[];
 }
 
-export class Prompt<
-  InputSchema extends ZodObject<any>,
-  OutputSchema extends ZodType | undefined = undefined
+interface PromptArgs<
+  InputSchema extends ZodObject<any> = ZodObject<any>,
+  OutputSchema extends ZodType | undefined = undefined,
+  State extends {} = Record<string, any>
 > {
+  /**
+   * The human readable name of the prompt.
+   * This is turned into camelCase and used as the name of the OpenAI function_call.
+   */
   name: string;
+  /**
+   * The human readable description of the prompt.
+   * This is used as the description of the OpenAI function_call.
+   */
   description?: string;
   /**
+   * An array of candidate prompts.
+   * When you run tests, each prompt is compiled with the test's prompt variables and evaluated.
    * The first prompt in the array is considered the "main" prompt.
    */
+  prompts: CandidatePrompt<z.infer<InputSchema>>[];
+  /**
+   * Zod schema for the prompt's input variables.
+   */
+  input: InputSchema;
+  /**
+   * Optional Zod schema for the prompt's output variables.
+   * This is used for parameters in the OpenAI function_call.
+   */
+  output?: OutputSchema;
+  /**
+   * Array of example data to use in CLI runs and tests.
+   */
+  exampleData?: ExampleDataSet<InputSchema>[];
+  /**
+   * Options to help you build CLI dialogs with the prompt.
+   */
+  cliOptions?: CLIOptions<InputSchema, OutputSchema, State>;
+
+  /**
+   * Prompt state that is persisted between CLI dialog actions.
+   * This is useful for storing messages and other data.
+   */
+  state: State;
+
+  //
+  // LLM parameters
+
+  model: OPENAI_CHAT_MODEL | OPENAI_INSTRUCT_MODEL;
+  temperature?: number;
+  max_tokens?: number;
+}
+
+export class Prompt<
+  InputSchema extends ZodObject<any>,
+  OutputSchema extends ZodType | undefined = undefined,
+  State extends {} = Record<string, any>
+> implements PromptArgs<InputSchema, OutputSchema, State>
+{
+  name: string;
+  description?: string;
+  cliOptions?: CLIOptions<InputSchema, OutputSchema, State>;
+
   prompts: CandidatePrompt<z.infer<InputSchema>>[];
   /**
    * Array of example data to use for CLI runs or testing.
@@ -78,34 +136,28 @@ export class Prompt<
   model: OPENAI_CHAT_MODEL | OPENAI_INSTRUCT_MODEL;
   input: InputSchema;
   output?: OutputSchema;
-  cliOptions?: CLIOptions<InputSchema>;
 
   temperature?: number;
   max_tokens?: number;
 
+  state: State;
+
   private extraMessages: ChatCompletionMessageParam[] = [];
   private tests: promptfoo.EvaluateTestSuite[] = [];
 
-  constructor(args: {
-    name: string;
-    description?: string;
-    model: OPENAI_CHAT_MODEL | OPENAI_INSTRUCT_MODEL;
-    temperature?: number;
-    max_tokens?: number;
-    prompts: CandidatePrompt<z.infer<InputSchema>>[];
-    input: InputSchema;
-    output?: OutputSchema;
-    exampleData?: ExampleDataSet<InputSchema>[];
-    cliOptions?: CLIOptions<InputSchema>;
-  }) {
+  constructor(args: PromptArgs<InputSchema, OutputSchema, State>) {
     this.name = args.name;
     this.output = args.output;
-    this.description = args.description;
-    this.prompts = args.prompts;
     this.input = args.input;
+    this.description = args.description;
+    if (this.description) {
+      this.input.describe(this.description);
+    }
+    this.prompts = args.prompts;
     this.model = args.model;
     this.exampleData = args.exampleData || [];
     this.cliOptions = args.cliOptions;
+    this.state = args.state;
   }
 
   withTest = (
@@ -124,7 +176,7 @@ export class Prompt<
           prompts: this.prompts.map((prompt) => prompt.compile(promptVars)),
           functions: [
             {
-              name: this.name,
+              name: toCamelCase(this.name),
               description: this.description,
               parameters: zodToJsonSchema(this.output),
             },
@@ -173,7 +225,20 @@ export class Prompt<
       this.input.shape
     ) as (keyof z.infer<InputSchema>)[];
     const args: z.infer<InputSchema> = {};
-    for (const key of keys) {
+    if (keys.length) {
+      console.log(
+        `The "${chalk.green(this.name)}" prompt takes ${keys.length} arguments:`
+      );
+      console.log();
+      await printZodSchema({
+        schema: this.input,
+        name: toCamelCase(this.name + "Args"),
+        onlyFields: true,
+      });
+      console.log();
+    }
+    for (let i = 0; i < keys.length; i++) {
+      const key = keys[i];
       const examples = this.exampleData.filter((set) => Boolean(set[key]));
       const formatKey = () =>
         (this.cliOptions?.inputKeyToCLIPrompt?.(key) || key.toString()) +
@@ -183,16 +248,26 @@ export class Prompt<
           {
             type: "search-list",
             name: key,
-            message: "Enter values for prompt variables",
+            message: `${i + 1}. ${key.toString()}`,
             choices: [
-              "input",
+              "input value",
+              "edit value",
               ...examples
-                .map((d) => Object.values(d).map((d) => d.name))
+                .map((d) =>
+                  Object.values(d).map(
+                    (d) =>
+                      `${d.name}${
+                        typeof d.value === "string"
+                          ? chalk.hex("#a5abb6")(` (${truncate(d.value, 30)})`)
+                          : ""
+                      }`
+                  )
+                )
                 .flat(),
             ],
           },
         ]);
-        if (answer[key] === "input") {
+        if (answer[key] === "input value") {
           const answer = await inquirer.prompt([
             {
               type: "input",
@@ -201,6 +276,10 @@ export class Prompt<
             },
           ]);
           args[key] = answer[key];
+        } else if (answer[key] === "edit value") {
+          const value = await edit({ input: "" }).action();
+          console.log(value);
+          args[key] = value as any;
         } else {
           console.log(args);
           args[key] = examples.find((d) => d[key].name === answer[key])![
@@ -220,13 +299,13 @@ export class Prompt<
     }
 
     // at this point, we have all the input variables
-    while (true) {
+    let nextActionName: string | undefined = undefined;
+    console.clear();
+    while (nextActionName !== "done" && nextActionName !== "exit") {
+      const messages = this.prompts[0].compile(args);
       // get the list of nextActions from the prompt's cliOptions or provide default options
-      const nextActions = this.cliOptions?.getNextActions?.(
-        this,
-        this.prompts[0].compile(args)
-      );
-      const nextActionName = await inquirer.prompt([
+      const nextActions = this.cliOptions?.getNextActions?.(this, messages);
+      const { action } = await inquirer.prompt([
         {
           type: "search-list",
           name: "action",
@@ -234,10 +313,9 @@ export class Prompt<
           choices: (nextActions || [])?.map((x) => x.name) || ["run"],
         },
       ]);
+      nextActionName = action;
       if (nextActionName) {
-        const nextAction = nextActions?.find(
-          (x) => x.name === nextActionName.action
-        );
+        const nextAction = nextActions?.find((x) => x.name === nextActionName);
         if (nextAction) {
           await nextAction.action();
         }
@@ -245,7 +323,7 @@ export class Prompt<
     }
   };
 
-  async runCLI() {
+  async runCLI(mode?: "test" | "run") {
     const schema = z.union([
       z.object({
         test: z.string().optional(),
@@ -263,15 +341,31 @@ export class Prompt<
       ...program.opts(),
     });
     if (Object.keys(opts).length === 0) {
-      // Use Inquirer.js to display a selection menu
-      const answer = await inquirer.prompt<{ action: "run" | "test" }>([
-        {
-          type: "search-list",
-          name: "action",
-          message: "Select an option:",
-          choices: ["run", "test"],
-        },
+      console.clear();
+      const choices = _.compact([
+        "run",
+        this.tests.length > 0 && "test",
+        "quit",
       ]);
+
+      if (choices.filter((x) => x !== "quit").length === 1 || mode === "run") {
+        await this.runLoop();
+        return;
+      } else {
+        console.log(`${chalk.green(this.name)} ${`(${this.description})`}`);
+        console.log("Would you like to run or test this prompt?");
+      }
+
+      const answer = mode
+        ? { action: mode }
+        : await inquirer.prompt<{ action: "run" | "test" }>([
+            {
+              type: "search-list",
+              name: "action",
+              message: "Options:",
+              choices,
+            },
+          ]);
 
       // Handle the selected option
       if (answer.action === "test") {
@@ -280,16 +374,18 @@ export class Prompt<
             type: "search-list",
             name: "test",
             message: "Select a test:",
-            choices: ["All", ...this.tests.map((test) => test.description)],
+            choices: ["all", ...this.tests.map((test) => test.description)],
           },
         ]);
-        if (test.test === "All") {
+        if (test.test === "all") {
           await this.test();
         } else {
           await this.test(test.test);
         }
       } else if (answer.action === "run") {
-        this.runLoop();
+        await this.runLoop();
+      } else {
+        return;
       }
     }
   }
@@ -318,7 +414,7 @@ export class Prompt<
       );
       for (let i = 0; i < results.table.head.prompts.length; i++) {
         const prompt = results.table.head.prompts[i];
-        prompt.display = this.prompts[i].name;
+        prompt.display = `Prompt: ${this.prompts[i].name}`;
       }
       console.log(promptfoo.generateTable(results).toString());
     }
