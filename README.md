@@ -13,9 +13,13 @@ A set of simple tools to accelerate the prompt engineering iteration cycle.
 - [zod](https://zod.dev/) integration for runtime type safety.
 - built in dialogs and prompts to help with the entire prompt engineering pipeline 
   - creating prompt instructions
+  - creating prompt input and output zod schemas
   - creating in-context examples
   - elaborating on examples
-  - quickly running artbitrary prompts inside the prompt your are editing
+  - quickly run prompts to generate text inside the prompt you are editing, eg. to create example data
+  - brainstorming possible inputs and edgecases, creating tests
+- easily build your own dialogs
+- easily extend for your purposes
 - no janky, unpolished UI, just good old fashioned CLI tools
 
 ## How to Use
