@@ -1,13 +1,17 @@
 import { z } from "zod";
-import { Action, Prompt } from "../prompt";
+import { Action, ExampleDataSet, Prompt } from "../prompt";
 import { ChatMessage } from "../openai/messages";
 import inquirer from "inquirer";
 import * as _ from "remeda";
 import { edit } from "./actions";
 import { ChatCompletionMessageParam } from "openai/resources";
-import { printChatMessages, printMarkdown } from "../helpers/printUtils";
+import { printChatMessages } from "../helpers/printUtils";
 import { runConcurrent } from "../openai/runConcurrent";
 import { createSchema } from "./createSchema";
+import { toCamelCase } from "../helpers/stringUtils";
+import highlight from "cli-highlight";
+import { sleep } from "openai/core";
+import { writeFileSync } from "fs";
 
 const input = z.object({
   goal: z.string(),
@@ -22,7 +26,8 @@ interface CreatePromptState {
 }
 
 /**
- * This is a prompt which uses ChatGPT to help you create a ChatGPT prompt. It's a bit meta :)
+ * This is a prompt which uses ChatGPT to help you create a ChatGPT prompt.
+ * It's a bit meta :)
  */
 export const createPrompt = new Prompt<
   typeof input,
@@ -48,6 +53,17 @@ export const createPrompt = new Prompt<
           name: "create prompt",
           action: async () => {
             const controller = new AbortController();
+            const numCalls = await inquirer.prompt([
+              {
+                type: "number",
+                name: "n_times",
+                message:
+                  "How many prompt variations should I generate? (default 1)",
+                default: 1,
+              },
+            ]);
+            const n = Math.min(Math.max(parseInt(numCalls.n_times), 0), 5);
+            console.clear();
             const results = await Promise.race([
               inquirer.prompt([
                 {
@@ -58,7 +74,7 @@ export const createPrompt = new Prompt<
               ]),
               (() => {
                 console.log();
-                return runConcurrent(initialMessages, 1, controller.signal);
+                return runConcurrent(initialMessages, n, controller.signal);
               })(),
             ]);
             controller.abort();
@@ -68,19 +84,31 @@ export const createPrompt = new Prompt<
               prompt.state.currentPrompt = results[0];
             } else if (results.length > 1) {
               // pick which result to use
+              const choices = [
+                ...results.map((_, i) => ({
+                  name: `Result #${i + 1}`,
+                  value: i,
+                })),
+                { name: "retry", value: "retry" },
+                { name: "cancel", value: "cancel" },
+              ];
               const { favorite } = await inquirer.prompt([
                 {
                   type: "list",
                   name: "favorite",
                   message: "Which prompt is your favorite?",
-                  choices: results.map((_, i) => ({
-                    name: `Result #${i + 1}`,
-                    value: i,
-                  })),
+                  choices,
                 },
               ]);
-              const result = results[parseInt(favorite)] as string;
-              prompt.state.currentPrompt = result;
+              if (favorite === "retry") {
+                return await actions[0].action();
+              } else if (favorite === "cancel") {
+                return;
+              } else {
+                const idx = parseInt(favorite);
+                const result = results[idx] as string;
+                prompt.state.currentPrompt = result;
+              }
             }
           },
         },
@@ -179,7 +207,52 @@ export const createPrompt = new Prompt<
             prompt.state.inputSchema = schemaPrompt.state.schema;
           },
         },
-        { name: "save", async action() {} },
+        {
+          name: "save",
+          enabled: () => !!prompt.state.currentPrompt,
+          async action() {
+            const name = "New Prompt";
+            const description = "Prompt Description";
+            const exampleData: ExampleDataSet<any>[] = [];
+
+            const code = `
+import { z } from "zod";
+
+${prompt.state.inputSchema || ""}
+
+${prompt.state.outputSchema || ""}
+
+interface ${toCamelCase(name)}State { }
+
+export const ${toCamelCase(name)} = new Prompt<
+  typeof input,
+  ${prompt.state.outputSchema ? "typeof output" : "undefined"},
+  ${toCamelCase(name)}State
+>({
+  state: {},
+  name: "${name}",
+  description: "${description}",
+  input,
+  model: "gpt-4",
+  prompts: [
+    {
+      name: "new",
+      compile: (vars) => [
+        ChatMessage.system(\`${prompt.state.currentPrompt}\`)
+      ]
+    }
+  ],
+  exampleData: ${JSON.stringify(exampleData, null, 2)},
+});
+
+if (require.main === module) {
+  ${toCamelCase(name)}.runCLI();
+}`;
+            await sleep(10_000);
+            console.log(highlight(code, { language: "ts" }));
+            writeFileSync("prompt.ts", code);
+          },
+        },
         {
           name: "quit",
           async action() {
@@ -215,7 +288,8 @@ export const createPrompt = new Prompt<
         ),
         ChatMessage.user(
           `
-The goal of the prompt is ${vars.goal}.
+The goal of the prompt: ${vars.goal}.
+${vars.idealOutput ? `Ideal output: ${vars.idealOutput}` : ""}
 `.trim()
         ),
       ],

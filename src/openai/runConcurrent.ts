@@ -2,6 +2,7 @@ import { streamText, generateText, openai } from "modelfusion";
 import { ChatCompletionMessageParam } from "openai/resources";
 import { printChatMessages, printMarkdown } from "../helpers/printUtils";
 import { ChatMessage } from "./messages";
+import * as _ from "remeda";
 
 export async function runConcurrent(
   messages: ChatCompletionMessageParam[],
@@ -25,20 +26,20 @@ export async function runConcurrent(
       }
       console.log();
     } else {
-      for (let i = 0; i < numCalls; i++) {
-        const text = await generateText(config, messages as any, {
-          run: { abortSignal },
-        });
-        results.push(text);
-
-        if (i > 0) {
-          printMarkdown("---");
-        }
-        printMarkdown(`# Result #${i + 1}:`);
-        printChatMessages({ messages: [ChatMessage.assistant(text)] });
-      }
+      const results: string[] = [];
+      await Promise.all(
+        _.range(0, numCalls).map(async () => {
+          const text = await generateText(config, messages as any, {
+            run: { abortSignal },
+          });
+          const i = results.push(text) - 1;
+          printMarkdown(`# Result #${i + 1}:`);
+          printChatMessages({ messages: [ChatMessage.assistant(text)] });
+          return text;
+        })
+      );
+      return results;
     }
-    return results;
   } catch (e) {
     if (e instanceof Error && e.message === "Aborted") {
       console.log("Stopped.");
