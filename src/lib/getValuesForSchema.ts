@@ -15,6 +15,7 @@ export async function getValuesForSchema<
   exampleData?: ExampleDataSet<Schema>[];
   formatKey?: (key: keyof z.infer<Schema>) => string;
 }) {
+  console.clear();
   const variables: Partial<z.infer<Schema>> = {
     ...(args.existingVariables || ({} as any)),
   };
@@ -23,7 +24,7 @@ export async function getValuesForSchema<
   ).filter((key) => !variables[key]);
   if (variableKeysWithoutValues.length) {
     console.log(
-      `The "${chalk.green(name)}" prompt takes ${
+      `The "${chalk.green(args.name)}" prompt takes ${
         variableKeysWithoutValues.length
       } arguments:`
     );
