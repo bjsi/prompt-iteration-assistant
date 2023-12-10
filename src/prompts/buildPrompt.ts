@@ -245,7 +245,13 @@ export const buildPrompt = (args?: {
                 }),
               ]);
               controller.abort();
-              console.log(results);
+              await inquirer.prompt([
+                {
+                  type: "confirm",
+                  name: "cancel",
+                  message: `Continue`,
+                },
+              ]);
             },
           },
           edit({

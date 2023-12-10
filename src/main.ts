@@ -1,3 +1,4 @@
+import { BRAINSTORM_IDEAS, brainstormIdeas } from "./examples/simple";
 import {
   BRAINSTORM_INPUTS,
   brainstormInputs,
@@ -24,6 +25,8 @@ if (require.main === module) {
     [CREATE_INPUT_SCHEMA]: createInputSchema,
     [CREATE_OUTPUT_SCHEMA]: createOutputSchema,
     [CREATE_NEW_PROMPT]: buildPrompt,
+    // testing
+    [BRAINSTORM_IDEAS]: brainstormIdeas,
   });
   promptController.cli();
 }
