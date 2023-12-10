@@ -16,10 +16,10 @@ export function printMarkdown(markdown: string) {
 
 export const printZodSchema = async (args: {
   schema: ZodType;
-  name: string;
+  name?: string;
   onlyFields?: boolean;
 }) => {
-  const tsInterface = await zodSchemaToInterface(args);
+  const tsInterface = highlightTS(await zodSchemaToInterface(args));
   if (args.onlyFields) {
     const fields = tsInterface
       .split("\n")

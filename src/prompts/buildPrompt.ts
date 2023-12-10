@@ -5,7 +5,11 @@ import inquirer from "inquirer";
 import * as _ from "remeda";
 import { edit } from "./actions";
 import { ChatCompletionMessageParam } from "openai/resources";
-import { highlightTS, printChatMessages } from "../helpers/printUtils";
+import {
+  highlightTS,
+  printChatMessages,
+  printZodSchema,
+} from "../helpers/printUtils";
 import { runConcurrent } from "../openai/runConcurrent";
 import { createOutputSchema } from "./createOutputSchema";
 import { toCamelCase, zodSchemaToInterface } from "../helpers/stringUtils";
@@ -45,20 +49,19 @@ export const buildPrompt = (args?: {
       getNextActions: async (prompt, initialMessages) => {
         console.clear();
         if (prompt.state.currentPrompt) {
-          console.log("Current Prompt:");
           if (prompt.state.inputSchema) {
-            console.log("Input Schema:");
-            console.log(
-              highlightTS(
-                await zodSchemaToInterface({
-                  schema: prompt.state.inputSchema,
-                })
-              )
-            );
+            await printZodSchema({
+              schema: prompt.state.inputSchema,
+              // onlyFields: true,
+              name: "Input",
+            });
           }
           if (prompt.state.outputSchema) {
-            console.log("Output Schema:");
-            console.log(prompt.state.outputSchema);
+            await printZodSchema({
+              schema: prompt.state.outputSchema,
+              //onlyFields: true,
+              name: "Output",
+            });
           }
           printChatMessages({
             messages: [ChatMessage.assistant(prompt.state.currentPrompt)],

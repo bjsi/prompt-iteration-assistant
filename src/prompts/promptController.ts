@@ -4,6 +4,9 @@ import inquirer from "inquirer";
 import { buildPrompt } from "./buildPrompt";
 import { chatMessagesToInstructPrompt } from "../openai/messages";
 import { toCamelCase, zodSchemaToInterface } from "../helpers/stringUtils";
+import zodToJsonSchema from "zod-to-json-schema";
+import { printZodSchema } from "../helpers/printUtils";
+import { z } from "zod";
 
 /**
  * A container for all the prompts in your program.
@@ -55,12 +58,12 @@ export class PromptController<
         message: "Select an action:",
         choices: [
           {
-            name: "Test",
-            value: "test",
+            name: "improve",
+            value: "improve",
           },
           {
-            name: "Improve",
-            value: "improve",
+            name: "test",
+            value: "test",
           },
         ],
       },
@@ -73,7 +76,6 @@ export class PromptController<
     } else {
       const idx = 0;
       const rawPrompt = p.prompts[idx].raw().compile();
-
       const build = buildPrompt({
         state: {
           currentPrompt: chatMessagesToInstructPrompt(rawPrompt),

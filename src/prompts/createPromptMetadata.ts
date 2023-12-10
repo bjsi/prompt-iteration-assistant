@@ -10,10 +10,8 @@ const input = z.object({
 });
 
 const output = z.object({
-  metadata: z.object({
-    name: z.string(),
-    description: z.string(),
-  }),
+  name: z.string(),
+  description: z.string(),
 });
 
 export const CREATE_PROMPT_METADATA = "Create Prompt Metadata";
@@ -25,7 +23,7 @@ export const createPromptMetadata = () =>
     description: "Create metadata to describe a ChatGPT prompt.",
     input,
     output,
-    model: "gpt-3.5-turbo",
+    model: "gpt-4",
     prompts: [
       new CandidatePrompt<z.infer<typeof input>>({
         name: "basic",

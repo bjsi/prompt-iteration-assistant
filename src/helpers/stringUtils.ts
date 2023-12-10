@@ -37,7 +37,7 @@ export const zodSchemaToInterface = async (args: {
   const tsInterface = await compile(
     // @ts-ignore
     jsonSchema,
-    args.name,
+    args.name || "Schema",
     { bannerComment: "" }
   );
   return tsInterface;
