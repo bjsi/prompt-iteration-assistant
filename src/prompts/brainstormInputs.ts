@@ -4,7 +4,7 @@ import { ChatMessage } from "../openai/messages";
 import { CandidatePrompt } from "../lib/candidatePrompt";
 
 const input = z.object({
-  text: z.string(),
+  prompt: z.string(),
 });
 
 export const BRAINSTORM_INPUTS = "Brainstorm Inputs";
@@ -23,6 +23,7 @@ export const brainstormInputs = (
     // we're brainstorming inputs to
     output: inputSchema,
     model: "gpt-4",
+    max_tokens: 300,
     prompts: [
       new CandidatePrompt<z.infer<typeof input>>({
         name: "simple",
@@ -32,8 +33,12 @@ export const brainstormInputs = (
               `
 # Instructions
 - Act as a senior ChatGPT prompt engineer.
-- Your role is to brainstorm the kinds of inputs that a prompt could take.
+- You are helping the user write tests for their prompt, as if it was a function
+- Your role is to come up with inputs to the prompt to use in tests.
         `.trim()
+            ),
+            ChatMessage.user(
+              `# My ChatGPT Prompt:\n"""${this.getVariable("prompt")}"""`
             ),
           ];
         },

@@ -9,6 +9,7 @@ import {
   highlightJSON,
   highlightTS,
   printChatMessages,
+  printMarkdownInBox,
   printZodSchema,
 } from "../helpers/printUtils";
 import {
@@ -23,6 +24,7 @@ import { createInputSchema } from "./createInputSchema";
 import { CandidatePrompt } from "../lib/candidatePrompt";
 import { createZodSchema } from "../helpers/zodUtils";
 import { generateText, openai, streamText } from "modelfusion";
+import chalk from "chalk";
 
 const input = z.object({
   goal: z.string(),
@@ -67,9 +69,7 @@ export const buildPrompt = (args?: {
               name: "Output",
             });
           }
-          printChatMessages({
-            messages: [ChatMessage.assistant(prompt.state.currentPrompt)],
-          });
+          printMarkdownInBox(prompt.state.currentPrompt, chalk.green("Prompt"));
         } else {
           printChatMessages({ messages: initialMessages, hideSystem: true });
         }

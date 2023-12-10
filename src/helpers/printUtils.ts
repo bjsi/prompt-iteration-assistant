@@ -14,6 +14,10 @@ export function printMarkdown(markdown: string) {
   console.log(marked(markdown));
 }
 
+export function printMarkdownInBox(markdown: string, title?: string) {
+  console.log(boxen(marked(markdown), { padding: 1, title }));
+}
+
 export const printZodSchema = async (args: {
   schema: ZodType;
   name?: string;

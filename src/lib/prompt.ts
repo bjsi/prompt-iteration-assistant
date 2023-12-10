@@ -26,9 +26,7 @@ import {
   streamText,
 } from "modelfusion";
 import * as _ from "remeda";
-import { toCamelCase, truncate } from "../helpers/stringUtils";
-import { printZodSchema } from "../helpers/printUtils";
-import { edit } from "../prompts/actions";
+import { toCamelCase } from "../helpers/stringUtils";
 import chalk from "chalk";
 import { CandidatePrompt } from "./candidatePrompt";
 import { getValuesForSchema as askUserForValuesForSchema } from "./getValuesForSchema";
@@ -230,6 +228,7 @@ export class Prompt<
       schema: this.input,
       existingVariables: this.vars,
       exampleData: this.exampleData,
+      prompt: chatMessagesToInstructPrompt(this.prompts[0].raw().compile()),
       formatKey: this.cliOptions?.inputKeyToCLIPrompt,
     });
   };
@@ -441,7 +440,7 @@ export class Prompt<
           maxCompletionTokens: this.max_tokens,
         })
         .asFunctionCallStructureGenerationModel({
-          fnName: this.name,
+          fnName: toCamelCase(this.name),
           fnDescription: this.description,
         });
       if (args.stream) {

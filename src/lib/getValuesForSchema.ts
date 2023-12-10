@@ -5,12 +5,15 @@ import { toCamelCase, truncate } from "../helpers/stringUtils";
 import { ExampleDataSet } from "./prompt";
 import inquirer from "inquirer";
 import { edit } from "../prompts/actions";
+import { brainstormInputs } from "../prompts/brainstormInputs";
+import { sleep } from "openai/core";
 
 export async function getValuesForSchema<
   Schema extends z.ZodObject<any>
 >(args: {
   name: string;
   schema: Schema;
+  prompt: string;
   existingVariables?: Partial<z.infer<Schema>>;
   exampleData?: ExampleDataSet<Schema>[];
   formatKey?: (key: keyof z.infer<Schema>) => string;
@@ -44,50 +47,31 @@ export async function getValuesForSchema<
     const formatKey = () =>
       (args.formatKey?.(key) || key.toString()) +
       (args.schema.shape[key].isOptional() ? " (optional)" : "");
-    if (examples.length) {
-      const answer = await inquirer.prompt([
-        {
-          type: "search-list",
-          name: key,
-          message: `${i + 1}. ${key.toString()}`,
-          choices: [
-            "input value",
-            "edit value",
-            ...examples
-              .map((d) =>
-                Object.values(d).map(
-                  (d) =>
-                    `${d.name}${
-                      typeof d.value === "string"
-                        ? chalk.hex("#a5abb6")(` (${truncate(d.value, 30)})`)
-                        : ""
-                    }`
-                )
+    const answer = await inquirer.prompt([
+      {
+        type: "search-list",
+        name: key,
+        message: `${i + 1}. ${key.toString()}`,
+        choices: [
+          "input value",
+          "edit value",
+          "generate value",
+          ...examples
+            .map((d) =>
+              Object.values(d).map(
+                (d) =>
+                  `${d.name}${
+                    typeof d.value === "string"
+                      ? chalk.hex("#a5abb6")(` (${truncate(d.value, 30)})`)
+                      : ""
+                  }`
               )
-              .flat(),
-          ],
-        },
-      ]);
-      if (answer[key] === "input value") {
-        const answer = await inquirer.prompt([
-          {
-            type: "input",
-            name: key,
-            message: formatKey(),
-          },
-        ]);
-        variables[key] = answer[key];
-      } else if (answer[key] === "edit value") {
-        const value = await edit({ input: "" }).action();
-        console.log(value);
-        variables[key] = value as any;
-      } else {
-        console.log(variables);
-        variables[key] = examples.find((d) => d[key].name === answer[key])![
-          key
-        ].value;
-      }
-    } else {
+            )
+            .flat(),
+        ],
+      },
+    ]);
+    if (answer[key] === "input value") {
       const answer = await inquirer.prompt([
         {
           type: "input",
@@ -96,6 +80,28 @@ export async function getValuesForSchema<
         },
       ]);
       variables[key] = answer[key];
+    } else if (answer[key] === "edit value") {
+      const value = await edit({ input: "" }).action();
+      console.log(value);
+      variables[key] = value as any;
+    } else if (answer[key] === "generate value") {
+      const example = await brainstormInputs(
+        z.object({ [key]: args.schema.shape[key] })
+      ).run({
+        promptVariables: {
+          prompt: args.prompt || "",
+        },
+        stream: false,
+        verbose: true,
+      });
+      console.log(example);
+      variables[key] = example[key];
+      await sleep(10_000);
+    } else {
+      console.log(variables);
+      variables[key] = examples.find((d) => d[key].name === answer[key])![
+        key
+      ].value;
     }
   }
   return variables;

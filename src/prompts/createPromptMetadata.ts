@@ -6,7 +6,7 @@ import { CandidatePrompt } from "../lib/candidatePrompt";
 interface CreatePromptMetadata {}
 
 const input = z.object({
-  text: z.string(),
+  prompt: z.string(),
 });
 
 const output = z.object({
@@ -20,7 +20,7 @@ export const createPromptMetadata = () =>
   new Prompt<typeof input, undefined, CreatePromptMetadata>({
     state: {},
     name: CREATE_PROMPT_METADATA,
-    description: "Create metadata to describe a ChatGPT prompt.",
+    description: "Create metadata to describe the user's ChatGPT prompt.",
     input,
     output,
     model: "gpt-4",
@@ -32,7 +32,7 @@ export const createPromptMetadata = () =>
             ChatMessage.system(`- Generate suitable metadata for the given ChatGPT prompt.
 - Ensure the metadata is a concise and descriptive representation of the prompt and its purpose.`),
             ChatMessage.user(
-              `# My ChatGPT Prompt:\n"""${this.getVariable("text")}"""`
+              `## My ChatGPT Prompt:\n"""${this.getVariable("prompt")}\n"""\n`
             ),
           ];
         },
