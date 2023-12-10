@@ -7,13 +7,13 @@ import inquirer from "inquirer";
 // @ts-ignore
 import searchlist from "inquirer-search-list";
 import dotenv from "dotenv";
-import { OPENAI_CHAT_MODEL, OPENAI_INSTRUCT_MODEL } from "./openai/models";
+import { OPENAI_CHAT_MODEL, OPENAI_INSTRUCT_MODEL } from "../openai/models";
 import {
   functionCallTestOptions,
   plainTextTestOptions,
-} from "./promptfoo/options";
-import { assertJSON, assertValidSchema } from "./promptfoo/assertions";
-import { chatMessagesToInstructPrompt } from "./openai/messages";
+} from "../promptfoo/options";
+import { assertJSON, assertValidSchema } from "../promptfoo/assertions";
+import { chatMessagesToInstructPrompt } from "../openai/messages";
 import {
   OpenAIChatMessage,
   OpenAICompletionModel,
@@ -26,18 +26,14 @@ import {
   streamText,
 } from "modelfusion";
 import * as _ from "remeda";
-import { toCamelCase, truncate } from "./helpers/stringUtils";
-import { printZodSchema } from "./helpers/printUtils";
-import { edit } from "./prompts/actions";
+import { toCamelCase, truncate } from "../helpers/stringUtils";
+import { printZodSchema } from "../helpers/printUtils";
+import { edit } from "../prompts/actions";
 import chalk from "chalk";
+import { CandidatePrompt } from "./candidatePrompt";
 
 dotenv.config();
 inquirer.registerPrompt("search-list", searchlist);
-
-export type CandidatePrompt<Args> = {
-  compile: (args: Args) => ChatCompletionMessageParam[];
-  name: string;
-};
 
 export type ExampleDataSet<T extends ZodType> = {
   [key in keyof z.infer<T>]: {
@@ -110,6 +106,12 @@ interface PromptArgs<
    */
   state: State;
 
+  /**
+   * Initial values for the prompt's input variables.
+   * Partial because the user can fill in the rest of the values in the CLI dialog.
+   */
+  vars?: Partial<z.infer<InputSchema>>;
+
   //
   // LLM parameters
 
@@ -141,6 +143,7 @@ export class Prompt<
   max_tokens?: number;
 
   state: State;
+  vars: Partial<z.infer<InputSchema>> = {};
 
   private extraMessages: ChatCompletionMessageParam[] = [];
   private tests: promptfoo.EvaluateTestSuite[] = [];
@@ -158,6 +161,7 @@ export class Prompt<
     this.exampleData = args.exampleData || [];
     this.cliOptions = args.cliOptions;
     this.state = args.state;
+    this.vars = args.vars || {};
   }
 
   withTest = (
@@ -173,7 +177,9 @@ export class Prompt<
   ) => {
     const options = this.output
       ? functionCallTestOptions({
-          prompts: this.prompts.map((prompt) => prompt.compile(promptVars)),
+          prompts: this.prompts.map((prompt) =>
+            prompt.withVariables(promptVars).compile()
+          ),
           functions: [
             {
               name: toCamelCase(this.name),
@@ -184,7 +190,9 @@ export class Prompt<
           model: this.model,
         })
       : plainTextTestOptions({
-          prompts: this.prompts.map((prompt) => prompt.compile(promptVars)),
+          prompts: this.prompts.map((prompt) =>
+            prompt.withVariables(promptVars).compile()
+          ),
           model: this.model,
         });
     const defaultAsserts = this.output ? [assertValidSchema(this.output)] : [];
@@ -224,7 +232,6 @@ export class Prompt<
     const keys = Object.keys(
       this.input.shape
     ) as (keyof z.infer<InputSchema>)[];
-    const args: z.infer<InputSchema> = {};
     if (keys.length) {
       console.log(
         `The "${chalk.green(this.name)}" prompt takes ${keys.length} arguments:`
@@ -275,14 +282,14 @@ export class Prompt<
               message: formatKey(),
             },
           ]);
-          args[key] = answer[key];
+          this.vars[key] = answer[key];
         } else if (answer[key] === "edit value") {
           const value = await edit({ input: "" }).action();
           console.log(value);
-          args[key] = value as any;
+          this.vars[key] = value as any;
         } else {
-          console.log(args);
-          args[key] = examples.find((d) => d[key].name === answer[key])![
+          console.log(this.vars);
+          this.vars[key] = examples.find((d) => d[key].name === answer[key])![
             key
           ].value;
         }
@@ -294,7 +301,7 @@ export class Prompt<
             message: formatKey(),
           },
         ]);
-        args[key] = answer[key];
+        this.vars[key] = answer[key];
       }
     }
 
@@ -302,7 +309,7 @@ export class Prompt<
     let nextActionName: string | undefined = undefined;
     console.clear();
     while (nextActionName !== "done" && nextActionName !== "exit") {
-      const messages = this.prompts[0].compile(args);
+      const messages = this.prompts[0].withVariables(this.vars).compile();
       // get the list of nextActions from the prompt's cliOptions or provide default options
       const nextActions = this.cliOptions?.getNextActions?.(this, messages);
       const { action } = await inquirer.prompt([
@@ -323,7 +330,7 @@ export class Prompt<
     }
   };
 
-  async runCLI(mode?: "test" | "run") {
+  async cli(mode?: "test" | "run") {
     const schema = z.union([
       z.object({
         test: z.string().optional(),
@@ -441,7 +448,8 @@ export class Prompt<
   }): Promise<any> {
     const promptVars = this.input.parse(args.promptVariables);
     const messages = this.prompts[0]
-      .compile(promptVars)
+      .withVariables(promptVars)
+      .compile()
       .concat(this.extraMessages);
     if (args.verbose) {
       console.log("model:", this.model);

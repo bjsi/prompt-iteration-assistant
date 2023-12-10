@@ -1,3 +1,7 @@
+import { compile } from "json-schema-to-typescript";
+import { ZodType } from "zod";
+import zodToJsonSchema from "zod-to-json-schema";
+
 export const capitalizeFirst = (str: string) =>
   str.charAt(0).toUpperCase() + str.slice(1);
 
@@ -23,4 +27,18 @@ export const fromCamelCase = (str: string) => {
 
 export const truncate = (str: string, n: number) => {
   return str.length > n ? str.substring(0, n - 1) + "..." : str;
+};
+
+export const zodSchemaToInterface = async (args: {
+  schema: ZodType;
+  name: string;
+}) => {
+  const jsonSchema = zodToJsonSchema(args.schema);
+  const tsInterface = await compile(
+    // @ts-ignore
+    jsonSchema,
+    args.name,
+    { bannerComment: "" }
+  );
+  return tsInterface;
 };

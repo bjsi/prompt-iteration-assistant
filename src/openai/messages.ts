@@ -1,6 +1,5 @@
-import { Chat, ChatCompletionMessageParam } from "openai/resources";
-
-import { z, ZodType } from "zod";
+import { ChatCompletionMessageParam } from "openai/resources";
+import { z } from "zod";
 
 const SystemMessageSchema = z.object({
   role: z.literal("system"),

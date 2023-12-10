@@ -1,12 +1,15 @@
 import { z } from "zod";
-import { Prompt } from "../prompt";
+import { Prompt } from "../lib/prompt";
 import { ChatMessage } from "../openai/messages";
+import { CandidatePrompt } from "../lib/candidatePrompt";
 
 interface CreateInputSchemaState {}
 
 const input = z.object({
-  text: z.string(),
+  rawPrompt: z.string(),
 });
+
+export const CREATE_INPUT_SCHEMA = "Create Input Schema";
 
 export const createInputSchema = new Prompt<
   typeof input,
@@ -14,26 +17,24 @@ export const createInputSchema = new Prompt<
   CreateInputSchemaState
 >({
   state: {},
-  name: "Create Input Schema",
+  name: CREATE_INPUT_SCHEMA,
   description: "Create a Zod schema based on the variables in the text input.",
   input,
   model: "gpt-4",
   prompts: [
-    {
+    new CandidatePrompt<z.infer<typeof input>>({
       name: "new",
-      compile: (vars) => [
-        ChatMessage.system(`- Construct a Zod schema based on the text input.
-- The variables use the following syntax: \`\${variableName\}\`.
+      compile: function () {
+        return [
+          ChatMessage.system(`- Construct a Zod schema based on the text input.
+- The variables use the following syntax: \${vars.variableName}.
 - For each variable in the prompt, create a corresponding key in the schema
 - Translate each prompt variable into respective Zod schema data types and structure.
 - Your replies should begin \`const schema = z.object({\``),
-        ChatMessage.user(`Input text: ${vars.text}`),
-      ],
-    },
+          ChatMessage.user(`Input text: ${this.getVariable("rawPrompt")}`),
+        ];
+      },
+    }),
   ],
   exampleData: [],
 });
-
-if (require.main === module) {
-  createInputSchema.runCLI("run");
-}

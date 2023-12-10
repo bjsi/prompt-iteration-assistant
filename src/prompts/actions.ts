@@ -4,7 +4,7 @@ import {
   chatMessagesToInstructPrompt,
   instructPromptToChatMessages,
 } from "../openai/messages";
-import { Action } from "../prompt";
+import { Action } from "../lib/prompt";
 
 export const edit = <T extends string | ChatCompletionMessageParam[]>(args: {
   input: T;

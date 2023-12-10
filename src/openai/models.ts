@@ -1,5 +1,5 @@
 /*
- * Available OpenAI chat models, their token limits, and pricing.
+ * Available OpenAI chat models.
  * @see https://platform.openai.com/docs/models/
  */
 export const OPENAI_CHAT_MODELS = [

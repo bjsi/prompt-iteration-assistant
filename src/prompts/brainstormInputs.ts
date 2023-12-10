@@ -1,51 +1,43 @@
 import { ZodObject, z } from "zod";
-import { Prompt } from "../prompt";
+import { Prompt } from "../lib/prompt";
 import { ChatMessage } from "../openai/messages";
+import { CandidatePrompt } from "../lib/candidatePrompt";
 
-const brainstormInputs = (
+const input = z.object({
+  text: z.string(),
+});
+
+export const BRAINSTORM_INPUTS = "Brainstorm Inputs";
+
+export const brainstormInputs = (
   // dynamic because we're brainstorming inputs arbitrary prompts we don't know about yet
   inputSchema?: ZodObject<any>
 ) =>
   new Prompt({
-    name: "brainstormInputs",
+    state: {},
+    name: BRAINSTORM_INPUTS,
     description:
-      "Brainstorm inputs to a prompt, considering the context in which it will be used and potential edge cases.",
-    input: z.object({
-      prompt: z.string(),
-    }),
-    // slightly confusing - the output schema for this prompt is the input schema for the prompt we're brainstorming inputs to
+      "Brainstorm inputs to a prompt, considering its input schema, the context in which it will be used and potential edge cases.",
+    input,
+    // the output schema for this prompt is
+    // the input schema for the prompt
+    // we're brainstorming inputs to
     output: inputSchema,
-    model: "gpt-3.5-turbo-instruct",
+    model: "gpt-4",
     prompts: [
-      {
-        // adapted from https://www.reddit.com/r/PromptEngineering/comments/12a5j34/iterative_prompt_creator/
-        name: "reddit",
-        compile: (vars) => [
-          ChatMessage.system(
-            `
+      new CandidatePrompt<z.infer<typeof input>>({
+        name: "simple",
+        compile: function () {
+          return [
+            ChatMessage.system(
+              `
 # Instructions
-- Act as a senior prompt engineer.
-- Task context: prompt testing.
+- Act as a senior ChatGPT prompt engineer.
 - Your role is to brainstorm the kinds of inputs that a prompt could take.
-`.trim()
-          ),
-        ],
-      },
-    ],
-    exampleData: [
-      {
-        prompt: {
-          name: "notes->flashcards",
-          value:
-            "To write a prompt which generates flashcards for me from my notes.",
+        `.trim()
+            ),
+          ];
         },
-      },
+      }),
     ],
-  }).withTest("flashcard assistant", {
-    prompt:
-      "To write a prompt which generates flashcards for me from my notes.",
   });
-
-if (require.main === module) {
-  brainstormInputs().runCLI();
-}

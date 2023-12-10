@@ -6,7 +6,7 @@ import { markedTerminal } from "marked-terminal";
 import { ChatCompletionMessageParam } from "openai/resources";
 import { ZodType } from "zod";
 import zodToJsonSchema from "zod-to-json-schema";
-import { capitalizeFirst } from "./stringUtils";
+import { capitalizeFirst, zodSchemaToInterface } from "./stringUtils";
 
 // @ts-ignore
 marked.use(markedTerminal());
@@ -20,16 +20,7 @@ export const printZodSchema = async (args: {
   name: string;
   onlyFields?: boolean;
 }) => {
-  const jsonSchema = zodToJsonSchema(args.schema);
-  const tsInterface = highlight(
-    await compile(
-      // @ts-ignore
-      jsonSchema,
-      args.name,
-      { bannerComment: "" }
-    ),
-    { language: "typescript" }
-  );
+  const tsInterface = await zodSchemaToInterface(args);
   if (args.onlyFields) {
     const fields = tsInterface
       .split("\n")
