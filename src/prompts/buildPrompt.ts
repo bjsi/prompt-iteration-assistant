@@ -61,7 +61,8 @@ export const buildPrompt = (args?: {
             return;
           }
           // todo: optimize by only running this if the variables have changed
-          const inputSchema = await createInputSchema.run({
+          const inputSchemaPrompt = createInputSchema();
+          const inputSchema = await inputSchemaPrompt.run({
             promptVariables: {
               rawPrompt: newPrompt,
             },
@@ -224,9 +225,9 @@ export const buildPrompt = (args?: {
             name: "output schema",
             enabled: () => !!prompt.state.currentPrompt,
             action: async () => {
-              // TODO: () => Prompt
-              await createOutputSchema.cli("run");
-              prompt.state.inputSchema = .state.schema;
+              const outputSchemaPrompt = createOutputSchema();
+              await outputSchemaPrompt.cli("run");
+              prompt.state.inputSchema = outputSchemaPrompt.state.schema;
             },
           },
           {

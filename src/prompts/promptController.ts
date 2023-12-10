@@ -1,24 +1,15 @@
 import chalk from "chalk";
 import { Prompt } from "../lib/prompt";
-import { createInputSchema } from "./createInputSchema";
-import {
-  CREATE_PROMPT_METADATA,
-  createPromptMetadata,
-} from "./createPromptMetadata";
 import inquirer from "inquirer";
 import { buildPrompt } from "./buildPrompt";
 import { chatMessagesToInstructPrompt } from "../openai/messages";
-import { zodSchema } from "modelfusion";
 import { toCamelCase, zodSchemaToInterface } from "../helpers/stringUtils";
-import { input } from "@inquirer/prompts";
 
-// select prompt or create new prompt
-// cli: test / improve
-// improve = run the buildPrompt cmd
-// test = select tests to run and iterate on
-
+/**
+ * A container for all the prompts in your program.
+ */
 export class PromptController<
-  Prompts extends Record<string, Prompt<any, any, any>>
+  Prompts extends Record<string, (...args: any[]) => Prompt<any, any, any>>
 > {
   private prompts: Prompts;
 
@@ -35,10 +26,13 @@ export class PromptController<
   }
 
   async cli() {
+    console.clear();
     console.log(`Welcome to ${chalk.blue("Prompt Iteration Assistant")}!`);
     if (Object.keys(this.prompts).length > 0) {
       console.log(
-        `You have ${chalk.green(this.prompts.length)} registered prompts.`
+        `You have ${chalk.green(
+          Object.keys(this.prompts).length
+        )} registered prompts.`
       );
     }
     const result = await inquirer.prompt([
@@ -46,14 +40,14 @@ export class PromptController<
         type: "search-list",
         name: "prompt",
         message: "Select a prompt to iterate on:",
-        choices: Object.values(this.prompts).map((p) => ({
-          name: p.name,
-          value: p,
+        choices: Object.entries(this.prompts).map(([k, v]) => ({
+          name: k,
+          value: k,
         })),
       },
     ]);
 
-    const prompt = result.prompt as Prompt<any, any, any>;
+    const prompt = this.getPrompt(result.prompt);
     const action = await inquirer.prompt([
       {
         type: "search-list",
@@ -72,15 +66,15 @@ export class PromptController<
       },
     ]);
 
+    const p = prompt();
     if (action.action === "test") {
-      await prompt.cli("test");
+      // todo: what if the prompt requires args?
+      await p.cli("test");
     } else {
-      // todo: what if there are multiple alternative prompts
-      // what format should the prompt be in? string? object?
       const idx = 0;
-      const rawPrompt = prompt.prompts[idx].raw().compile();
+      const rawPrompt = p.prompts[idx].raw().compile();
       const inputSchema = await zodSchemaToInterface({
-        schema: prompt.input,
+        schema: p.input,
         name: toCamelCase(prompt.name + "Variables"),
       });
 
@@ -90,8 +84,8 @@ export class PromptController<
           inputSchema: inputSchema,
         },
         vars: {
-          goal: prompt.description,
-          idealOutput: prompt.output,
+          goal: p.description,
+          idealOutput: p.output,
         },
       });
       await build.cli("run");

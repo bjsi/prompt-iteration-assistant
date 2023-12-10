@@ -42,6 +42,7 @@ export class CandidatePrompt<Variables extends {}> {
    * NOTE: can't be an arrow function because you need to access `this` to get the variables.
    */
   compile: (this: CandidatePrompt<Variables>) => ChatCompletionMessageParam[];
+  private unboundCompile: () => ChatCompletionMessageParam[];
 
   private variables: Variables = {} as any;
 
@@ -52,19 +53,20 @@ export class CandidatePrompt<Variables extends {}> {
   }) {
     this.name = args.name;
     this.compile = args.compile.bind(this);
-    this._raw = args.raw || false;
+    this.unboundCompile = args.compile;
+    this._raw = !!args.raw;
   }
 
-  withVariables = (args: Variables) => {
+  withVariables(args: Variables) {
     this.variables = args;
     return this;
-  };
+  }
 
   raw() {
     // need to make a copy of the prompt so that we don't mutate the original
     return new CandidatePrompt<Variables>({
       name: this.name,
-      compile: this.compile,
+      compile: this.unboundCompile,
       raw: true,
     });
   }
@@ -77,7 +79,7 @@ export class CandidatePrompt<Variables extends {}> {
    * to generate a new prompt based on the current prompt. This allows us to keep the
    * type safety benefits of using string interpolation but also get the raw string version :)
    */
-  getVariable = <K extends keyof Variables>(key: K) => {
+  getVariable<K extends keyof Variables>(key: K) {
     if (this._raw) {
       return `\${${key.toString()}}`;
     } else {
@@ -89,5 +91,5 @@ export class CandidatePrompt<Variables extends {}> {
       }
       return value;
     }
-  };
+  }
 }

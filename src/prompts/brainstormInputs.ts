@@ -10,7 +10,7 @@ const input = z.object({
 export const BRAINSTORM_INPUTS = "Brainstorm Inputs";
 
 export const brainstormInputs = (
-  // dynamic because we're brainstorming inputs arbitrary prompts we don't know about yet
+  // dynamic because we're brainstorming inputs for arbitrary prompts we don't know about yet
   inputSchema?: ZodObject<any>
 ) =>
   new Prompt({

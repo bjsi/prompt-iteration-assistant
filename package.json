@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "create-prompt": "npx tsx src/prompts/createPrompt.ts"
+    "main": "npx tsx src/main.ts"
   },
   "author": "",
   "license": "ISC",
