@@ -31,7 +31,7 @@ export const truncate = (str: string, n: number) => {
 
 export const zodSchemaToInterface = async (args: {
   schema: ZodType;
-  name: string;
+  name?: string;
 }) => {
   const jsonSchema = zodToJsonSchema(args.schema);
   const tsInterface = await compile(

@@ -73,19 +73,15 @@ export class PromptController<
     } else {
       const idx = 0;
       const rawPrompt = p.prompts[idx].raw().compile();
-      const inputSchema = await zodSchemaToInterface({
-        schema: p.input,
-        name: toCamelCase(prompt.name + "Variables"),
-      });
 
       const build = buildPrompt({
         state: {
           currentPrompt: chatMessagesToInstructPrompt(rawPrompt),
-          inputSchema: inputSchema,
+          inputSchema: p.input,
+          outputSchema: p.output,
         },
         vars: {
           goal: p.description,
-          idealOutput: p.output,
         },
       });
       await build.cli("run");

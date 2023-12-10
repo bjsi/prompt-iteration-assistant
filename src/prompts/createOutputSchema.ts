@@ -4,6 +4,7 @@ import { ChatMessage } from "../openai/messages";
 import highlight from "cli-highlight";
 import { edit } from "./actions";
 import { CandidatePrompt } from "../lib/candidatePrompt";
+import { highlightTS } from "../helpers/printUtils";
 
 interface CreateSchemaState {
   schema?: string;
@@ -23,7 +24,7 @@ export const createOutputSchema = () =>
     input,
     model: "gpt-4",
     cliOptions: {
-      getNextActions(prompt, initialMessages) {
+      async getNextActions(prompt, initialMessages) {
         return [
           edit({
             input: !prompt.state.schema
@@ -45,7 +46,7 @@ const output = z.object({
       },
       formatChatMessage(message) {
         if (message.role === "assistant") {
-          const hl = highlight(message.content || "", { language: "js" });
+          const hl = highlightTS(message.content || "");
           console.log(hl);
           return hl;
         } else {

@@ -1,12 +1,11 @@
 import chalk from "chalk";
-import highlight from "cli-highlight";
-import { compile } from "json-schema-to-typescript";
 import { marked } from "marked";
 import { markedTerminal } from "marked-terminal";
 import { ChatCompletionMessageParam } from "openai/resources";
 import { ZodType } from "zod";
-import zodToJsonSchema from "zod-to-json-schema";
 import { capitalizeFirst, zodSchemaToInterface } from "./stringUtils";
+import boxen from "boxen";
+import highlight from "cli-highlight";
 
 // @ts-ignore
 marked.use(markedTerminal());
@@ -43,9 +42,15 @@ export const printChatMessages = (args: PrintChatMessagesArgs) => {
     messages
       .filter((message) => (hideSystem ? message.role !== "system" : true))
       .map((message) => {
-        const role = chalk.green(capitalizeFirst(message.role)) + ":\n";
-        return role + marked(message.content?.toString() || "");
+        const role = chalk.green(capitalizeFirst(message.role));
+        return boxen(marked(message.content?.toString() || ""), {
+          title: role,
+        });
       })
       .join("\n\n")
   );
 };
+
+export function highlightTS(text: string) {
+  return highlight(text, { language: "ts" });
+}

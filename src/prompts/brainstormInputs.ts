@@ -16,8 +16,7 @@ export const brainstormInputs = (
   new Prompt({
     state: {},
     name: BRAINSTORM_INPUTS,
-    description:
-      "Brainstorm inputs to a prompt, considering its input schema, the context in which it will be used and potential edge cases.",
+    description: "Brainstorm inputs to a ChatGPT prompt.",
     input,
     // the output schema for this prompt is
     // the input schema for the prompt

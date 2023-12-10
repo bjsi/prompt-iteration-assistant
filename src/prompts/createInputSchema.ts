@@ -28,7 +28,7 @@ export const createInputSchema = () =>
 - The variables use the following syntax: \${vars.variableName}.
 - For each variable in the prompt, create a corresponding key in the schema
 - Translate each prompt variable into respective Zod schema data types and structure.
-- Your replies should begin \`const schema = z.object({\``),
+- Your replies should begin: z.object({`),
             ChatMessage.user(`Input text: ${this.getVariable("rawPrompt")}`),
           ];
         },

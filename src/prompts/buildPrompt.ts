@@ -1,19 +1,20 @@
-import { z } from "zod";
+import { ZodObject, z } from "zod";
 import { Action, ExampleDataSet, Prompt } from "../lib/prompt";
 import { ChatMessage } from "../openai/messages";
 import inquirer from "inquirer";
 import * as _ from "remeda";
 import { edit } from "./actions";
 import { ChatCompletionMessageParam } from "openai/resources";
-import { printChatMessages } from "../helpers/printUtils";
+import { highlightTS, printChatMessages } from "../helpers/printUtils";
 import { runConcurrent } from "../openai/runConcurrent";
 import { createOutputSchema } from "./createOutputSchema";
-import { toCamelCase } from "../helpers/stringUtils";
+import { toCamelCase, zodSchemaToInterface } from "../helpers/stringUtils";
 import highlight from "cli-highlight";
 import { sleep } from "openai/core";
 import { writeFileSync } from "fs";
 import { createInputSchema } from "./createInputSchema";
 import { CandidatePrompt } from "../lib/candidatePrompt";
+import { createZodSchema } from "../helpers/zodUtils";
 
 const input = z.object({
   goal: z.string(),
@@ -23,8 +24,8 @@ const input = z.object({
 interface BuildPromptState {
   currentPrompt?: string;
   feedback?: ChatCompletionMessageParam[];
-  inputSchema?: string;
-  outputSchema?: string;
+  inputSchema?: ZodObject<any>;
+  outputSchema?: ZodObject<any>;
 }
 
 /**
@@ -43,13 +44,29 @@ export const buildPrompt = (args?: {
     input,
     model: "gpt-4",
     cliOptions: {
-      getNextActions: (prompt, initialMessages) => {
+      getNextActions: async (prompt, initialMessages) => {
         console.clear();
-        printChatMessages({ messages: initialMessages, hideSystem: true });
         if (prompt.state.currentPrompt) {
+          console.log("Current Prompt:");
+          if (prompt.state.inputSchema) {
+            console.log("Input Schema:");
+            console.log(
+              highlightTS(
+                await zodSchemaToInterface({
+                  schema: prompt.state.inputSchema,
+                })
+              )
+            );
+          }
+          if (prompt.state.outputSchema) {
+            console.log("Output Schema:");
+            console.log(prompt.state.outputSchema);
+          }
           printChatMessages({
             messages: [ChatMessage.assistant(prompt.state.currentPrompt)],
           });
+        } else {
+          printChatMessages({ messages: initialMessages, hideSystem: true });
         }
 
         const updateCurrentPrompt = async (newPrompt: string) => {
@@ -62,20 +79,23 @@ export const buildPrompt = (args?: {
           }
           // todo: optimize by only running this if the variables have changed
           const inputSchemaPrompt = createInputSchema();
-          const inputSchema = await inputSchemaPrompt.run({
+          const inputSchemaText = await inputSchemaPrompt.run({
             promptVariables: {
               rawPrompt: newPrompt,
             },
             stream: false,
           });
-          if (inputSchema) {
-            prompt.state.inputSchema = inputSchema;
+          if (inputSchemaText) {
+            const schema = createZodSchema(inputSchemaText);
+            if (schema) {
+              prompt.state.inputSchema = schema;
+            }
           }
         };
 
         const actions: Action<any>[] = [
           {
-            name: "create prompt",
+            name: "generate variations",
             action: async () => {
               const controller = new AbortController();
               const numCalls = await inquirer.prompt([
@@ -138,7 +158,7 @@ export const buildPrompt = (args?: {
             },
           },
           {
-            name: "test prompt",
+            name: "test run",
             enabled: () => !!prompt.state.currentPrompt,
             action: async () => {
               if (!prompt.state.currentPrompt) {
@@ -227,7 +247,13 @@ export const buildPrompt = (args?: {
             action: async () => {
               const outputSchemaPrompt = createOutputSchema();
               await outputSchemaPrompt.cli("run");
-              prompt.state.inputSchema = outputSchemaPrompt.state.schema;
+              const outputSchemaText = outputSchemaPrompt.state.schema;
+              if (outputSchemaText) {
+                const schema = createZodSchema(outputSchemaText);
+                if (schema) {
+                  prompt.state.outputSchema = schema;
+                }
+              }
             },
           },
           {
@@ -272,7 +298,7 @@ if (require.main === module) {
   ${toCamelCase(name)}.runCLI();
 }`;
               console.log("Saving to prompt.ts");
-              console.log(highlight(code, { language: "ts" }));
+              console.log(highlightTS(code));
               await sleep(2000);
               writeFileSync("prompt.ts", code);
             },
@@ -313,10 +339,12 @@ if (require.main === module) {
             ),
             ChatMessage.user(
               `
-The goal of the prompt: ${this.getVariable("goal")}.
+# The goal of the prompt
+- ${this.getVariable("goal")}
 ${
   this.getVariable("idealOutput")
-    ? `Ideal output: ${this.getVariable("idealOutput")}.`
+    ? `# Ideal output from GPT
+- ${highlightTS(this.getVariable("idealOutput"))}`
     : ""
 }
 `.trim()

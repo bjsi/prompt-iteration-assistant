@@ -58,7 +58,7 @@ export interface CLIOptions<
   getNextActions?: (
     prompt: Prompt<InputSchema, OutputSchema, State>,
     messages: ChatCompletionMessageParam[]
-  ) => Action<any>[];
+  ) => Promise<Action<any>[]>;
 }
 
 interface PromptArgs<
@@ -229,12 +229,14 @@ export class Prompt<
    * before calling the `nextAction` handler.
    */
   private runLoop = async () => {
-    const keys = Object.keys(
-      this.input.shape
-    ) as (keyof z.infer<InputSchema>)[];
-    if (keys.length) {
+    const variableKeysWithoutValues = (
+      Object.keys(this.input.shape) as (keyof z.infer<InputSchema>)[]
+    ).filter((key) => !this.vars[key]);
+    if (variableKeysWithoutValues.length) {
       console.log(
-        `The "${chalk.green(this.name)}" prompt takes ${keys.length} arguments:`
+        `The "${chalk.green(this.name)}" prompt takes ${
+          variableKeysWithoutValues.length
+        } arguments:`
       );
       console.log();
       await printZodSchema({
@@ -244,8 +246,8 @@ export class Prompt<
       });
       console.log();
     }
-    for (let i = 0; i < keys.length; i++) {
-      const key = keys[i];
+    for (let i = 0; i < variableKeysWithoutValues.length; i++) {
+      const key = variableKeysWithoutValues[i];
       const examples = this.exampleData.filter((set) => Boolean(set[key]));
       const formatKey = () =>
         (this.cliOptions?.inputKeyToCLIPrompt?.(key) || key.toString()) +
@@ -311,7 +313,10 @@ export class Prompt<
     while (nextActionName !== "done" && nextActionName !== "exit") {
       const messages = this.prompts[0].withVariables(this.vars).compile();
       // get the list of nextActions from the prompt's cliOptions or provide default options
-      const nextActions = this.cliOptions?.getNextActions?.(this, messages);
+      const nextActions = await this.cliOptions?.getNextActions?.(
+        this,
+        messages
+      );
       const { action } = await inquirer.prompt([
         {
           type: "search-list",
