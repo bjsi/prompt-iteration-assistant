@@ -1,7 +1,7 @@
 import chalk from "chalk";
 import { Prompt } from "../lib/prompt";
 import inquirer from "inquirer";
-import { buildPrompt } from "./buildPrompt";
+import { CREATE_NEW_PROMPT, buildPrompt } from "./buildPrompt";
 import { chatMessagesToInstructPrompt } from "../openai/messages";
 import { toCamelCase, zodSchemaToInterface } from "../helpers/stringUtils";
 import zodToJsonSchema from "zod-to-json-schema";
@@ -42,7 +42,7 @@ export class PromptController<
       {
         type: "search-list",
         name: "prompt",
-        message: "Select a prompt to iterate on:",
+        message: "Select a prompt:",
         choices: Object.entries(this.prompts).map(([k, v]) => ({
           name: k,
           value: k,
@@ -58,7 +58,7 @@ export class PromptController<
         message: "Select an action:",
         choices: [
           {
-            name: "improve",
+            name: result.prompt === CREATE_NEW_PROMPT ? "run" : "improve",
             value: "improve",
           },
           {

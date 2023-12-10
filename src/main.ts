@@ -2,6 +2,7 @@ import {
   BRAINSTORM_INPUTS,
   brainstormInputs,
 } from "./prompts/brainstormInputs";
+import { CREATE_NEW_PROMPT, buildPrompt } from "./prompts/buildPrompt";
 import {
   CREATE_INPUT_SCHEMA,
   createInputSchema,
@@ -22,6 +23,7 @@ if (require.main === module) {
     [BRAINSTORM_INPUTS]: brainstormInputs,
     [CREATE_INPUT_SCHEMA]: createInputSchema,
     [CREATE_OUTPUT_SCHEMA]: createOutputSchema,
+    [CREATE_NEW_PROMPT]: buildPrompt,
   });
   promptController.cli();
 }

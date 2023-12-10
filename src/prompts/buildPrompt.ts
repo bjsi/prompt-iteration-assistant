@@ -38,6 +38,8 @@ interface BuildPromptState {
   promptWeAreBuilding?: Prompt<any, any, any>;
 }
 
+export const CREATE_NEW_PROMPT = "Create New Prompt";
+
 /**
  * This is a prompt which uses ChatGPT to help you create or build upon a ChatGPT prompt.
  * It's a bit meta :)
@@ -49,7 +51,7 @@ export const buildPrompt = (args?: {
   new Prompt<typeof input, undefined, BuildPromptState>({
     state: args?.state || {},
     vars: args?.vars || {},
-    name: "Create Prompt",
+    name: CREATE_NEW_PROMPT,
     description: "Create a ChatGPT prompt to solve the user's task",
     input,
     model: "gpt-4",
