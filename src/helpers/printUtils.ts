@@ -54,3 +54,7 @@ export const printChatMessages = (args: PrintChatMessagesArgs) => {
 export function highlightTS(text: string) {
   return highlight(text, { language: "ts" });
 }
+
+export function highlightJSON(text: string) {
+  return highlight(text, { language: "json" });
+}

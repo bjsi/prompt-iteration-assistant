@@ -6,18 +6,23 @@ import * as _ from "remeda";
 import { edit } from "./actions";
 import { ChatCompletionMessageParam } from "openai/resources";
 import {
+  highlightJSON,
   highlightTS,
   printChatMessages,
   printZodSchema,
 } from "../helpers/printUtils";
-import { runConcurrent } from "../openai/runConcurrent";
+import {
+  generateConcurrently,
+  generateTextConcurrently,
+} from "../openai/runConcurrent";
 import { createOutputSchema } from "./createOutputSchema";
-import { toCamelCase, zodSchemaToInterface } from "../helpers/stringUtils";
+import { toCamelCase } from "../helpers/stringUtils";
 import { sleep } from "openai/core";
 import { writeFileSync } from "fs";
 import { createInputSchema } from "./createInputSchema";
 import { CandidatePrompt } from "../lib/candidatePrompt";
 import { createZodSchema } from "../helpers/zodUtils";
+import { generateText, openai, streamText } from "modelfusion";
 
 const input = z.object({
   goal: z.string(),
@@ -28,6 +33,7 @@ interface BuildPromptState {
   feedback?: ChatCompletionMessageParam[];
   inputSchema?: ZodObject<any>;
   outputSchema?: ZodObject<any>;
+  promptWeAreBuilding?: Prompt<any, any, any>;
 }
 
 /**
@@ -118,7 +124,11 @@ export const buildPrompt = (args?: {
                 ]),
                 (() => {
                   console.log();
-                  return runConcurrent(initialMessages, n, controller.signal);
+                  return generateTextConcurrently({
+                    messages: initialMessages as ChatMessage[],
+                    numCalls: n,
+                    abortSignal: controller.signal,
+                  });
                 })(),
               ]);
               controller.abort();
@@ -163,7 +173,15 @@ export const buildPrompt = (args?: {
               if (!prompt.state.currentPrompt) {
                 return;
               }
-              // get inputs
+
+              const promptWeAreBuilding = prompt.state.promptWeAreBuilding;
+              if (!promptWeAreBuilding) {
+                return;
+              }
+
+              const inputVariables =
+                (await promptWeAreBuilding?.askUserForValuesForInputSchema()) ||
+                {};
 
               const answer = await inquirer.prompt([
                 {
@@ -180,6 +198,10 @@ export const buildPrompt = (args?: {
                 5
               );
               const controller = new AbortController();
+              const llmArgs = {
+                promptVariables: inputVariables,
+                abortSignal: controller.signal,
+              };
               const results = await Promise.race([
                 inquirer.prompt([
                   {
@@ -188,11 +210,37 @@ export const buildPrompt = (args?: {
                     message: `Stop Generation?`,
                   },
                 ]),
-                runConcurrent(
-                  // todo: compile prompt
-                  [ChatMessage.user(prompt.state.currentPrompt!)],
-                  numCalls
-                ),
+                generateConcurrently({
+                  stream: () =>
+                    Promise.resolve(
+                      (async function* () {
+                        const stream = await promptWeAreBuilding.run({
+                          ...llmArgs,
+                          stream: true,
+                        });
+
+                        for await (const part of stream) {
+                          if (typeof part === "string") {
+                            yield part;
+                          } else {
+                            yield highlightJSON(JSON.stringify(part, null, 2));
+                          }
+                        }
+                      })()
+                    ),
+                  generate: async () => {
+                    const res = await promptWeAreBuilding.run({
+                      ...llmArgs,
+                      stream: false,
+                    });
+                    if (typeof res === "string") {
+                      return res;
+                    } else {
+                      return highlightJSON(JSON.stringify(res, null, 2));
+                    }
+                  },
+                  numCalls,
+                }),
               ]);
               controller.abort();
               console.log(results);
@@ -226,7 +274,14 @@ export const buildPrompt = (args?: {
                 ChatMessage.assistant(prompt.state.currentPrompt!),
                 ChatMessage.user(answer.feedback),
               ];
-              const response = await runConcurrent(messages, 1);
+
+              const controller = new AbortController();
+              // todo: cancellation
+              const response = await generateTextConcurrently({
+                messages: messages as ChatMessage[],
+                numCalls: 1,
+                abortSignal: controller.signal,
+              });
               const revisedPrompt = response[0];
               const confirm = await inquirer.prompt([
                 {

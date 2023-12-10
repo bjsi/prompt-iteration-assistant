@@ -1,5 +1,8 @@
-import { z, ZodSchema } from "zod";
+import { z } from "zod";
 
+/**
+ * Takes a string of zod code and returns a zod schema.
+ */
 export function createZodSchema(zodText: string): z.ZodObject<any> | undefined {
   const schemaCode = `
 const schema = ${zodText};

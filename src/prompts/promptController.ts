@@ -81,6 +81,7 @@ export class PromptController<
           currentPrompt: chatMessagesToInstructPrompt(rawPrompt),
           inputSchema: p.input,
           outputSchema: p.output,
+          promptWeAreEditing: p,
         },
         vars: {
           goal: p.description,

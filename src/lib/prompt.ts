@@ -31,6 +31,7 @@ import { printZodSchema } from "../helpers/printUtils";
 import { edit } from "../prompts/actions";
 import chalk from "chalk";
 import { CandidatePrompt } from "./candidatePrompt";
+import { getValuesForSchema as askUserForValuesForSchema } from "./getValuesForSchema";
 
 dotenv.config();
 inquirer.registerPrompt("search-list", searchlist);
@@ -223,91 +224,23 @@ export class Prompt<
     return this;
   };
 
+  askUserForValuesForInputSchema = async () => {
+    return await askUserForValuesForSchema({
+      name: this.name,
+      schema: this.input,
+      existingVariables: this.vars,
+      exampleData: this.exampleData,
+      formatKey: this.cliOptions?.inputKeyToCLIPrompt,
+    });
+  };
+
   /**
    * Each `Prompt` contains its own `nextAction` handlers, but all of them require
    * filling out the `input` schema first, so this method fills out the input schema
    * before calling the `nextAction` handler.
    */
   private runLoop = async () => {
-    const variableKeysWithoutValues = (
-      Object.keys(this.input.shape) as (keyof z.infer<InputSchema>)[]
-    ).filter((key) => !this.vars[key]);
-    if (variableKeysWithoutValues.length) {
-      console.log(
-        `The "${chalk.green(this.name)}" prompt takes ${
-          variableKeysWithoutValues.length
-        } arguments:`
-      );
-      console.log();
-      await printZodSchema({
-        schema: this.input,
-        name: toCamelCase(this.name + "Args"),
-        onlyFields: true,
-      });
-      console.log();
-    }
-    for (let i = 0; i < variableKeysWithoutValues.length; i++) {
-      const key = variableKeysWithoutValues[i];
-      const examples = this.exampleData.filter((set) => Boolean(set[key]));
-      const formatKey = () =>
-        (this.cliOptions?.inputKeyToCLIPrompt?.(key) || key.toString()) +
-        (this.input.shape[key].isOptional() ? " (optional)" : "");
-      if (examples.length) {
-        const answer = await inquirer.prompt([
-          {
-            type: "search-list",
-            name: key,
-            message: `${i + 1}. ${key.toString()}`,
-            choices: [
-              "input value",
-              "edit value",
-              ...examples
-                .map((d) =>
-                  Object.values(d).map(
-                    (d) =>
-                      `${d.name}${
-                        typeof d.value === "string"
-                          ? chalk.hex("#a5abb6")(` (${truncate(d.value, 30)})`)
-                          : ""
-                      }`
-                  )
-                )
-                .flat(),
-            ],
-          },
-        ]);
-        if (answer[key] === "input value") {
-          const answer = await inquirer.prompt([
-            {
-              type: "input",
-              name: key,
-              message: formatKey(),
-            },
-          ]);
-          this.vars[key] = answer[key];
-        } else if (answer[key] === "edit value") {
-          const value = await edit({ input: "" }).action();
-          console.log(value);
-          this.vars[key] = value as any;
-        } else {
-          console.log(this.vars);
-          this.vars[key] = examples.find((d) => d[key].name === answer[key])![
-            key
-          ].value;
-        }
-      } else {
-        const answer = await inquirer.prompt([
-          {
-            type: "input",
-            name: key,
-            message: formatKey(),
-          },
-        ]);
-        this.vars[key] = answer[key];
-      }
-    }
-
-    // at this point, we have all the input variables
+    this.vars = await this.askUserForValuesForInputSchema();
     let nextActionName: string | undefined = undefined;
     console.clear();
     while (nextActionName !== "done" && nextActionName !== "exit") {
@@ -436,6 +369,7 @@ export class Prompt<
     promptVariables: z.infer<InputSchema>;
     stream: true;
     verbose?: boolean;
+    abortSignal?: AbortSignal;
   }): Promise<
     OutputSchema extends ZodType<infer U>
       ? AsyncIterable<StructureStreamPart<U>>
@@ -445,11 +379,13 @@ export class Prompt<
     promptVariables: z.infer<InputSchema>;
     stream: false;
     verbose?: boolean;
+    abortSignal?: AbortSignal;
   }): Promise<OutputSchema extends ZodType<infer U> ? U : string | null>;
   async run(args: {
     promptVariables: z.infer<InputSchema>;
     stream: boolean;
     verbose?: boolean;
+    abortSignal?: AbortSignal;
   }): Promise<any> {
     const promptVars = this.input.parse(args.promptVariables);
     const messages = this.prompts[0]
@@ -483,7 +419,8 @@ export class Prompt<
           config as any,
           config instanceof OpenAICompletionModel
             ? chatMessagesToInstructPrompt(messages)
-            : messages
+            : messages,
+          { run: { abortSignal: args.abortSignal } }
         );
         return stream;
       } else {
@@ -491,7 +428,8 @@ export class Prompt<
           config as any,
           config instanceof OpenAICompletionModel
             ? chatMessagesToInstructPrompt(messages)
-            : messages
+            : messages,
+          { run: { abortSignal: args.abortSignal } }
         );
         return text;
       }
@@ -510,14 +448,16 @@ export class Prompt<
         const stream = await streamStructure(
           config,
           new ZodSchema(this.output),
-          messages as OpenAIChatMessage[]
+          messages as OpenAIChatMessage[],
+          { run: { abortSignal: args.abortSignal } }
         );
         return stream;
       } else {
         return await generateStructure(
           config,
           new ZodSchema(this.output),
-          messages as OpenAIChatMessage[]
+          messages as OpenAIChatMessage[],
+          { run: { abortSignal: args.abortSignal } }
         );
       }
     }
