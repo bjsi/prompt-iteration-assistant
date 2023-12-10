@@ -9,7 +9,6 @@ import { highlightTS, printChatMessages } from "../helpers/printUtils";
 import { runConcurrent } from "../openai/runConcurrent";
 import { createOutputSchema } from "./createOutputSchema";
 import { toCamelCase, zodSchemaToInterface } from "../helpers/stringUtils";
-import highlight from "cli-highlight";
 import { sleep } from "openai/core";
 import { writeFileSync } from "fs";
 import { createInputSchema } from "./createInputSchema";
@@ -18,7 +17,6 @@ import { createZodSchema } from "../helpers/zodUtils";
 
 const input = z.object({
   goal: z.string(),
-  idealOutput: z.string().optional(),
 });
 
 interface BuildPromptState {
@@ -315,8 +313,6 @@ if (require.main === module) {
       inputKeyToCLIPrompt(key) {
         if (key === "goal") {
           return "Goal of the prompt:";
-        } else if (key === "idealOutput") {
-          return "Ideal output:";
         } else {
           return key;
         }
@@ -341,12 +337,6 @@ if (require.main === module) {
               `
 # The goal of the prompt
 - ${this.getVariable("goal")}
-${
-  this.getVariable("idealOutput")
-    ? `# Ideal output from GPT
-- ${highlightTS(this.getVariable("idealOutput"))}`
-    : ""
-}
 `.trim()
             ),
           ];
