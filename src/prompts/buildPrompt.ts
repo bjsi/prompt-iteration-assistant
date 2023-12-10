@@ -52,14 +52,12 @@ export const buildPrompt = (args?: {
           if (prompt.state.inputSchema) {
             await printZodSchema({
               schema: prompt.state.inputSchema,
-              // onlyFields: true,
               name: "Input",
             });
           }
           if (prompt.state.outputSchema) {
             await printZodSchema({
               schema: prompt.state.outputSchema,
-              //onlyFields: true,
               name: "Output",
             });
           }
