@@ -1,4 +1,6 @@
 import { ChatCompletionMessageParam } from "openai/resources";
+import { chatMessagesToInstructPrompt } from "../openai/messages";
+import { getPromptVars } from "./substitutePromptVars";
 
 /**
  * @example
@@ -72,6 +74,13 @@ export class CandidatePrompt<Variables extends {}> {
       compile: this.unboundCompile,
       raw: true,
     });
+  }
+
+  getAllVariablePlaceholders() {
+    const compiled = this.raw().compile();
+    const asString = chatMessagesToInstructPrompt(compiled);
+    const vars = getPromptVars(asString);
+    return vars;
   }
 
   /**

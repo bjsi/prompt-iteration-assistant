@@ -44,7 +44,6 @@ export async function generateConcurrently(args: {
       }
       console.log();
     } else {
-      const results: string[] = [];
       await Promise.all(
         _.range(0, args.numCalls).map(async () => {
           const text = await args.generate();
@@ -54,8 +53,8 @@ export async function generateConcurrently(args: {
           return text;
         })
       );
-      return results;
     }
+    return results;
   } catch (e) {
     if (e instanceof Error && e.message === "Aborted") {
       console.log("Stopped.");

@@ -8,7 +8,7 @@ import {
 import inquirer from "inquirer";
 import * as _ from "remeda";
 import { edit } from "./actions";
-import { Chat, ChatCompletionMessageParam } from "openai/resources";
+import { ChatCompletionMessageParam } from "openai/resources";
 import {
   highlightJSON,
   highlightTS,
@@ -29,7 +29,6 @@ import { createInputSchema } from "./createInputSchema";
 import { CandidatePrompt } from "../lib/candidatePrompt";
 import { createZodSchema } from "../helpers/zodUtils";
 import chalk from "chalk";
-import { getValuesForSchema } from "../lib/getValuesForSchema";
 import { substituteChatPromptVars } from "../lib/substitutePromptVars";
 
 const input = z.object({
@@ -87,6 +86,7 @@ export const buildPrompt = (args?: {
         }
 
         const updateCurrentPrompt = async (newPromptText: string) => {
+          const oldPrompt = prompt.state.currentPrompt?.prompts[0];
           if (!prompt.state.currentPrompt) {
             prompt.state.currentPrompt = new Prompt({
               state: {},
@@ -111,10 +111,16 @@ export const buildPrompt = (args?: {
               }
             },
           });
-          if (!newPromptText.includes("${")) {
+
+          const newPromptVars =
+            curPrompt.prompts[0].getAllVariablePlaceholders();
+          const oldPromptVars = oldPrompt?.getAllVariablePlaceholders() || [];
+          const difference = _.difference(newPromptVars, oldPromptVars);
+          if (difference.length < 1) {
             return;
           }
-          // todo: optimize by only running this if the variables have changed
+          console.log("Prompt Variables: ", newPromptVars);
+          console.log("Generating input schema...");
           const inputSchemaPrompt = createInputSchema();
           const inputSchemaText = await inputSchemaPrompt.run({
             promptVariables: {
@@ -166,11 +172,34 @@ export const buildPrompt = (args?: {
               controller.abort();
               if (!Array.isArray(results) || results.length === 0) {
                 return;
-              } else {
-                console.log("PICK");
-
-                console.log(results);
-                // pick which result to use
+              } else if (results.length === 1) {
+                console.clear();
+                printChatMessages({
+                  messages: instructPromptToChatMessages(
+                    `# System\n` + results[0]
+                  ),
+                });
+                const choices = [
+                  { name: "accept", value: "accept" },
+                  { name: "retry", value: "retry" },
+                  { name: "cancel", value: "cancel" },
+                ];
+                const choice = await inquirer.prompt([
+                  {
+                    type: "list",
+                    name: "choice",
+                    message: "Accept this prompt?",
+                    choices,
+                  },
+                ]);
+                if (choice.choice === "accept") {
+                  await updateCurrentPrompt("# System\n" + results[0]);
+                } else if (choice.choice === "retry") {
+                  return await actions[0].action();
+                } else {
+                  return;
+                }
+              } else if (results.length > 1) {
                 const choices = [
                   ...results.map((_, i) => ({
                     name: `Result #${i + 1}`,
@@ -407,10 +436,29 @@ export const ${toCamelCase(name)} = new Prompt<
 if (require.main === module) {
   ${toCamelCase(name)}.runCLI();
 }`;
+
+              function removeDuplicateEmptyLines(code: string): string {
+                const lines = code.split("\n");
+                const newLines: string[] = [];
+                let lastLine = "";
+
+                for (let i = 0; i < lines.length; i++) {
+                  const line = lines[i];
+                  if (line === "" && lastLine === "") {
+                    continue;
+                  }
+                  newLines.push(line);
+                  lastLine = line;
+                }
+
+                return newLines.join("\n");
+              }
+              const cleanCode = removeDuplicateEmptyLines(code);
+
               console.log("Saving to prompt.ts");
-              console.log(highlightTS(code));
+              console.log(highlightTS(cleanCode));
               await sleep(2000);
-              writeFileSync("prompt.ts", code);
+              writeFileSync("prompt.ts", cleanCode);
             },
           },
           {
@@ -442,7 +490,7 @@ if (require.main === module) {
 - Create a very concise system prompt instructions for ChatGPT tailored to the user's specific needs.
 - Don't include examples in the prompt.
 - If the prompt requires input variables, use the following format: \${variableName}.
-- Format the prompt using markdown.
+- Format the instructions using a markdown list.
 `.trim()
             ),
             ChatMessage.user(
