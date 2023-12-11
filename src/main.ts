@@ -24,7 +24,6 @@ if (require.main === module) {
     [BRAINSTORM_INPUTS]: brainstormInputs,
     [CREATE_INPUT_SCHEMA]: createInputSchema,
     [CREATE_OUTPUT_SCHEMA]: createOutputSchema,
-    [CREATE_NEW_PROMPT]: buildPrompt,
     // testing
     [BRAINSTORM_IDEAS]: brainstormIdeas,
   });

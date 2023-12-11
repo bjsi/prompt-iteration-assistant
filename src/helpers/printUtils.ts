@@ -6,6 +6,7 @@ import { ZodType } from "zod";
 import { capitalizeFirst, zodSchemaToInterface } from "./stringUtils";
 import boxen from "boxen";
 import highlight from "cli-highlight";
+import { ChatMessage, chatMessagesToInstructPrompt } from "../openai/messages";
 
 // @ts-ignore
 marked.use(markedTerminal());
@@ -16,6 +17,11 @@ export function printMarkdown(markdown: string) {
 
 export function printMarkdownInBox(markdown: string, title?: string) {
   console.log(boxen(marked(markdown), { padding: 1, title }));
+}
+
+export function printPrompt(message: ChatMessage[]) {
+  const md = chatMessagesToInstructPrompt(message);
+  printMarkdownInBox(md, chalk.green("Prompt"));
 }
 
 export const printZodSchema = async (args: {

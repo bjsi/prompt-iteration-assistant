@@ -34,7 +34,7 @@ export class CandidatePrompt<Variables extends {}> {
   /**
    * If true, the prompt will be compiled without the variables filled in.
    */
-  private _raw = false;
+  _raw = false;
   /**
    * A function that returns an array of chat messages with or without the variables
    * filled in, depending on the value of `raw`.
@@ -44,7 +44,10 @@ export class CandidatePrompt<Variables extends {}> {
   compile: (this: CandidatePrompt<Variables>) => ChatCompletionMessageParam[];
   private unboundCompile: () => ChatCompletionMessageParam[];
 
-  private variables: Variables = {} as any;
+  /**
+   * The variables to be used in the prompt. Use `this.getVariable()` to access them.
+   */
+  variables: Variables = {} as any;
 
   constructor(args: {
     name: string;

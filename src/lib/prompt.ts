@@ -84,7 +84,7 @@ interface PromptArgs<
   /**
    * Zod schema for the prompt's input variables.
    */
-  input: InputSchema;
+  input?: InputSchema;
   /**
    * Optional Zod schema for the prompt's output variables.
    * This is used for parameters in the OpenAI function_call.
@@ -135,7 +135,7 @@ export class Prompt<
    */
   exampleData: ExampleDataSet<InputSchema>[];
   model: OPENAI_CHAT_MODEL | OPENAI_INSTRUCT_MODEL;
-  input: InputSchema;
+  input?: InputSchema;
   output?: OutputSchema;
 
   temperature?: number;
@@ -153,7 +153,7 @@ export class Prompt<
     this.input = args.input;
     this.description = args.description;
     if (this.description) {
-      this.input.describe(this.description);
+      this.input?.describe(this.description);
     }
     this.prompts = args.prompts;
     this.model = args.model;
@@ -223,6 +223,9 @@ export class Prompt<
   };
 
   askUserForValuesForInputSchema = async () => {
+    if (!this.input) {
+      return {};
+    }
     return await askUserForValuesForSchema({
       name: this.name,
       schema: this.input,
@@ -386,7 +389,7 @@ export class Prompt<
     verbose?: boolean;
     abortSignal?: AbortSignal;
   }): Promise<any> {
-    const promptVars = this.input.parse(args.promptVariables);
+    const promptVars = this.input?.parse(args.promptVariables) || {};
     const messages = this.prompts[0]
       .withVariables(promptVars)
       .compile()

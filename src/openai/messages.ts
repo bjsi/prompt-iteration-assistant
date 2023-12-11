@@ -87,7 +87,7 @@ export const instructPromptToChatMessages = (prompt: string) => {
   let content: string[] = [];
 
   lines.forEach((line) => {
-    if (line.match(/^# (System|User|Assistant)/)) {
+    if (line.match(/^# (System|User|Assistant)\s*$/)) {
       if (currentRole && content.length > 0) {
         messages.push(createChatMessage(currentRole, content.join("\n")));
       }
@@ -106,5 +106,9 @@ export const instructPromptToChatMessages = (prompt: string) => {
 };
 
 const createChatMessage = (role: ChatMessage["role"], content: string) => {
+  role = role.toLowerCase() as ChatMessage["role"];
+  if (!["system", "user", "assistant"].includes(role)) {
+    throw new Error(`Invalid role: ${role}`);
+  }
   return ChatMessage[role](content);
 };

@@ -27,9 +27,9 @@ export async function getValuesForSchema<
   ).filter((key) => !variables[key]);
   if (variableKeysWithoutValues.length) {
     console.log(
-      `The "${chalk.green(args.name)}" prompt takes ${
+      `${chalk.green(args.name)} requires ${
         variableKeysWithoutValues.length
-      } arguments:`
+      } argument${variableKeysWithoutValues.length === 1 ? "" : "s"}:`
     );
     console.log();
     await printZodSchema({
@@ -51,7 +51,7 @@ export async function getValuesForSchema<
       {
         type: "search-list",
         name: key,
-        message: `${i + 1}. ${key.toString()}`,
+        message: `${i + 1}. ${formatKey()}`,
         choices: [
           "input value",
           "edit value",
@@ -62,7 +62,7 @@ export async function getValuesForSchema<
                 (d) =>
                   `${d.name}${
                     typeof d.value === "string"
-                      ? chalk.hex("#a5abb6")(` (${truncate(d.value, 30)})`)
+                      ? chalk.hex("#a5abb6")(` ("${truncate(d.value, 30)}")`)
                       : ""
                   }`
               )

@@ -19,7 +19,7 @@ export async function generateTextConcurrently(args: {
       abortSignal,
     },
   };
-  return generateConcurrently({
+  return await generateConcurrently({
     stream: () => streamText(config, initialMessages as ChatMessage[], opts),
     generate: () =>
       generateText(config, initialMessages as ChatMessage[], opts),
