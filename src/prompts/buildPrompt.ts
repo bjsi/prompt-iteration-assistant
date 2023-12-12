@@ -30,6 +30,7 @@ import { CandidatePrompt } from "../lib/candidatePrompt";
 import { createZodSchema } from "../helpers/zodUtils";
 import chalk from "chalk";
 import { substituteChatPromptVars } from "../lib/substitutePromptVars";
+import { variablesMissingValues } from "../lib/getValuesForSchema";
 
 const input = z.object({
   goal: z.string(),
@@ -41,6 +42,9 @@ interface BuildPromptState {
 }
 
 export const CREATE_NEW_PROMPT = "New Prompt";
+
+export const DEFAULT_PROMPT_NAME = "New Prompt";
+export const DEFAULT_PROMPT_DESCRIPTION = "Prompt Description";
 
 /**
  * This is a prompt which uses ChatGPT to help you create or edit a ChatGPT prompt.
@@ -58,7 +62,7 @@ export const buildPrompt = (args?: {
     input,
     model: "gpt-4",
     cliOptions: {
-      getNextActions: async (prompt, initialMessages) => {
+      getNextActions: async (prompt) => {
         console.clear();
         const curPrompt = prompt.state.currentPrompt;
         if (curPrompt) {
@@ -82,7 +86,10 @@ export const buildPrompt = (args?: {
             )} command or ${chalk.green("edit")} one manually.`,
             chalk.green("Prompt")
           );
-          printChatMessages({ messages: initialMessages, hideSystem: true });
+          printChatMessages({
+            messages: prompt.prompts[0].raw().compile(),
+            hideSystem: true,
+          });
         }
 
         const updateCurrentPrompt = async (newPromptText: string) => {
@@ -90,8 +97,8 @@ export const buildPrompt = (args?: {
           if (!prompt.state.currentPrompt) {
             prompt.state.currentPrompt = new Prompt({
               state: {},
-              name: "New Prompt",
-              description: "New Prompt",
+              name: DEFAULT_PROMPT_NAME,
+              description: DEFAULT_PROMPT_DESCRIPTION,
               model: "gpt-4",
               prompts: [],
             });
@@ -102,10 +109,10 @@ export const buildPrompt = (args?: {
             name: "generated",
             compile: function () {
               if (this._raw) {
-                return newPromptMessages;
+                return newPromptMessages.messages;
               } else {
                 return substituteChatPromptVars(
-                  newPromptMessages,
+                  newPromptMessages.messages,
                   this.variables
                 );
               }
@@ -140,6 +147,31 @@ export const buildPrompt = (args?: {
           {
             name: "generate variations",
             action: async () => {
+              const missing = variablesMissingValues({
+                schema: prompt.input!,
+                existingVariables: prompt.vars,
+              });
+              if (!missing.length) {
+                console.log(
+                  "Existing variables: ",
+                  highlightJSON(JSON.stringify(prompt.vars, null, 2))
+                );
+              }
+              if (
+                missing.length ||
+                (!missing.length &&
+                  !(
+                    await inquirer.prompt([
+                      {
+                        type: "confirm",
+                        name: "confirm",
+                        message: "Use existing variables?",
+                      },
+                    ])
+                  ).confirm)
+              ) {
+                await prompt.askUserForValuesForInputSchema();
+              }
               const controller = new AbortController();
               const numCalls = await inquirer.prompt([
                 {
@@ -163,7 +195,7 @@ export const buildPrompt = (args?: {
                 (() => {
                   console.log();
                   return generateTextConcurrently({
-                    messages: initialMessages as ChatMessage[],
+                    messages: prompt.prompts[0].compile() as ChatMessage[],
                     numCalls: n,
                     abortSignal: controller.signal,
                   });
@@ -177,7 +209,7 @@ export const buildPrompt = (args?: {
                 printChatMessages({
                   messages: instructPromptToChatMessages(
                     `# System\n` + results[0]
-                  ),
+                  ).messages,
                 });
                 const choices = [
                   { name: "accept", value: "accept" },
@@ -233,14 +265,13 @@ export const buildPrompt = (args?: {
             name: "test run",
             enabled: () => !!prompt.state.currentPrompt,
             action: async () => {
-              if (!prompt.state.currentPrompt) {
+              const currentPrompt = prompt.state.currentPrompt;
+              if (!currentPrompt) {
                 return;
               }
 
-              const promptBeingEdited = prompt.state.currentPrompt;
-              const inputVariables = prompt.state.currentPrompt
-                ? await promptBeingEdited?.askUserForValuesForInputSchema()
-                : {};
+              const inputVariables =
+                await currentPrompt?.askUserForValuesForInputSchema();
 
               const answer = await inquirer.prompt([
                 {
@@ -269,46 +300,37 @@ export const buildPrompt = (args?: {
                     message: `Stop Generation?`,
                   },
                 ]),
-                promptBeingEdited
-                  ? generateConcurrently({
-                      stream: () =>
-                        Promise.resolve(
-                          (async function* () {
-                            const stream = await promptBeingEdited.run({
-                              ...llmArgs,
-                              stream: true,
-                            });
-
-                            for await (const part of stream) {
-                              if (typeof part === "string") {
-                                yield part;
-                              } else {
-                                yield highlightJSON(
-                                  JSON.stringify(part, null, 2)
-                                );
-                              }
-                            }
-                          })()
-                        ),
-                      generate: async () => {
-                        const res = await promptBeingEdited.run({
+                generateConcurrently({
+                  stream: () =>
+                    Promise.resolve(
+                      (async function* () {
+                        const stream = await currentPrompt.run({
                           ...llmArgs,
-                          stream: false,
+                          stream: true,
                         });
-                        if (typeof res === "string") {
-                          return res;
-                        } else {
-                          return highlightJSON(JSON.stringify(res, null, 2));
+
+                        for await (const part of stream) {
+                          if (typeof part === "string") {
+                            yield part;
+                          } else {
+                            yield highlightJSON(JSON.stringify(part, null, 2));
+                          }
                         }
-                      },
-                      numCalls,
-                    })
-                  : // todo: wrong because we may have created an output schema
-                    generateTextConcurrently({
-                      messages: initialMessages as ChatMessage[],
-                      numCalls,
-                      abortSignal: controller.signal,
-                    }),
+                      })()
+                    ),
+                  generate: async () => {
+                    const res = await currentPrompt.run({
+                      ...llmArgs,
+                      stream: false,
+                    });
+                    if (typeof res === "string") {
+                      return res;
+                    } else {
+                      return highlightJSON(JSON.stringify(res, null, 2));
+                    }
+                  },
+                  numCalls,
+                }),
               ]);
               controller.abort();
               await inquirer.prompt([
@@ -321,11 +343,15 @@ export const buildPrompt = (args?: {
             },
           },
           edit({
-            input: chatMessagesToInstructPrompt(
-              prompt.state.currentPrompt?.prompts?.[0]?.raw().compile() || [
-                ChatMessage.system("## Instructions:"),
-              ]
-            ),
+            input: chatMessagesToInstructPrompt({
+              messages: prompt.state.currentPrompt?.prompts?.[0]
+                ?.raw()
+                .compile() || [ChatMessage.system("## Instructions:")],
+              attributes: {
+                name: prompt.state.currentPrompt?.name,
+                description: prompt.state.currentPrompt?.description,
+              },
+            }),
             onSaved: async (updatedPrompt) => {
               if (!updatedPrompt) {
                 return;
@@ -337,6 +363,8 @@ export const buildPrompt = (args?: {
             name: "feedback",
             enabled: () => !!prompt.state.currentPrompt,
             async action() {
+              // TODO: check this.vars
+
               if (!prompt.state.currentPrompt) {
                 return;
               }
@@ -348,11 +376,13 @@ export const buildPrompt = (args?: {
                 },
               ]);
               const messages: ChatCompletionMessageParam[] = [
-                ...initialMessages,
+                ...prompt.prompts[0].compile(),
                 ChatMessage.assistant(
-                  chatMessagesToInstructPrompt(
-                    prompt.state.currentPrompt.prompts[0].raw().compile()
-                  )
+                  chatMessagesToInstructPrompt({
+                    messages: prompt.state.currentPrompt.prompts[0]
+                      .raw()
+                      .compile(),
+                  })
                 ),
                 ChatMessage.user(answer.feedback),
               ];
@@ -487,16 +517,15 @@ if (require.main === module) {
               `
 - You are a ChatGPT prompt engineer helping a user create a ChatGPT system instructions prompt.
 - Your role is to write a ChatGPT system instructions prompt to achieve the user's goal.
-- Create a very concise system prompt instructions for ChatGPT tailored to the user's specific needs.
-- Don't include examples in the prompt.
+- Aim for extreme brevity and clarity.
+- Don't include examples.
 - If the prompt requires input variables, use the following format: \${variableName}.
-- Format the instructions using a markdown list.
+- Format the instructions using a markdown unordered list.
 `.trim()
             ),
             ChatMessage.user(
               `
 # The goal of the prompt
-- ${this.getVariable("goal")}
 `.trim()
             ),
           ];

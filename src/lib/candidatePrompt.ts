@@ -77,8 +77,8 @@ export class CandidatePrompt<Variables extends {}> {
   }
 
   getAllVariablePlaceholders() {
-    const compiled = this.raw().compile();
-    const asString = chatMessagesToInstructPrompt(compiled);
+    const messages = this.raw().compile();
+    const asString = chatMessagesToInstructPrompt({ messages });
     const vars = getPromptVars(asString);
     return vars;
   }

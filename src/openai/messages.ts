@@ -1,4 +1,5 @@
 import { ChatCompletionMessageParam } from "openai/resources";
+import fm from "front-matter";
 import { z } from "zod";
 
 const SystemMessageSchema = z.object({
@@ -60,10 +61,17 @@ export const ChatMessage = {
   },
 };
 
-export const chatMessagesToInstructPrompt = (
-  messages: ChatCompletionMessageParam[]
-) => {
-  return messages
+const promptFrontMatterSchema = z.object({
+  name: z.string().optional(),
+  description: z.string().optional(),
+});
+
+export const chatMessagesToInstructPrompt = (args: {
+  messages: ChatCompletionMessageParam[];
+  attributes?: z.infer<typeof promptFrontMatterSchema>;
+}) => {
+  const { messages, attributes } = args;
+  const body = messages
     .map((m) => {
       if (m.role === "system") {
         return `# System\n${m.content}`;
@@ -78,10 +86,30 @@ export const chatMessagesToInstructPrompt = (
       }
     })
     .join("\n\n");
+
+  const frontMatter = attributes
+    ? `---\n${Object.entries(attributes)
+        .map(([key, value]) => {
+          return `${key}: ${value}`;
+        })
+        .join("\n")}\n---\n\n`
+    : "";
+  return `${frontMatter}${body}`;
 };
 
-export const instructPromptToChatMessages = (prompt: string) => {
-  const lines = prompt.split("\n");
+export interface ChatMessagesWithAttributes {
+  messages: ChatMessage[];
+  attributes?: z.infer<typeof promptFrontMatterSchema>;
+}
+
+export const instructPromptToChatMessages = (
+  promptText: string
+): ChatMessagesWithAttributes => {
+  const parsed = fm(promptText);
+  const attributes = promptFrontMatterSchema.safeParse(parsed.attributes);
+  const body = parsed.body;
+
+  const lines = body.split("\n");
   const messages = [];
   let currentRole: ChatMessage["role"] | null = null;
   let content: string[] = [];
@@ -102,7 +130,10 @@ export const instructPromptToChatMessages = (prompt: string) => {
     messages.push(createChatMessage(currentRole, content.join("\n")));
   }
 
-  return messages;
+  return {
+    attributes: attributes.success ? attributes.data : undefined,
+    messages,
+  };
 };
 
 const createChatMessage = (role: ChatMessage["role"], content: string) => {

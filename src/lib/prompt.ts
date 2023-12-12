@@ -55,8 +55,7 @@ export interface CLIOptions<
   formatChatMessage?: (message: ChatCompletionMessageParam) => any;
   inputKeyToCLIPrompt?: (key: keyof z.infer<InputSchema>) => string;
   getNextActions?: (
-    prompt: Prompt<InputSchema, OutputSchema, State>,
-    messages: ChatCompletionMessageParam[]
+    prompt: Prompt<InputSchema, OutputSchema, State>
   ) => Promise<Action<any>[]>;
 }
 
@@ -94,6 +93,10 @@ interface PromptArgs<
    * Array of example data to use in CLI runs and tests.
    */
   exampleData?: ExampleDataSet<InputSchema>[];
+  /**
+   * Don't suggest example data in the CLI when picking input values.
+   */
+  dontSuggestExampleData?: boolean;
   /**
    * Options to help you build CLI dialogs with the prompt.
    */
@@ -134,6 +137,7 @@ export class Prompt<
    * Array of example data to use for CLI runs or testing.
    */
   exampleData: ExampleDataSet<InputSchema>[];
+  dontSuggestExampleData?: boolean | undefined;
   model: OPENAI_CHAT_MODEL | OPENAI_INSTRUCT_MODEL;
   input?: InputSchema;
   output?: OutputSchema;
@@ -161,6 +165,7 @@ export class Prompt<
     this.cliOptions = args.cliOptions;
     this.state = args.state;
     this.vars = args.vars || {};
+    this.dontSuggestExampleData = args.dontSuggestExampleData;
   }
 
   withTest = (
@@ -230,8 +235,14 @@ export class Prompt<
       name: this.name,
       schema: this.input,
       existingVariables: this.vars,
-      exampleData: this.exampleData,
-      prompt: chatMessagesToInstructPrompt(this.prompts[0].raw().compile()),
+      exampleData: this.dontSuggestExampleData ? [] : this.exampleData,
+      prompt: chatMessagesToInstructPrompt({
+        messages: this.prompts[0].raw().compile(),
+        attributes: {
+          name: this.name,
+          description: this.description,
+        },
+      }),
       formatKey: this.cliOptions?.inputKeyToCLIPrompt,
     });
   };
@@ -242,16 +253,12 @@ export class Prompt<
    * before calling the `nextAction` handler.
    */
   private runLoop = async () => {
-    this.vars = await this.askUserForValuesForInputSchema();
+    // this.vars = await this.askUserForValuesForInputSchema();
     let nextActionName: string | undefined = undefined;
     console.clear();
     while (nextActionName !== "done" && nextActionName !== "exit") {
-      const messages = this.prompts[0].withVariables(this.vars).compile();
       // get the list of nextActions from the prompt's cliOptions or provide default options
-      const nextActions = await this.cliOptions?.getNextActions?.(
-        this,
-        messages
-      );
+      const nextActions = await this.cliOptions?.getNextActions?.(this);
       const { action } = await inquirer.prompt([
         {
           type: "search-list",
@@ -397,7 +404,7 @@ export class Prompt<
     if (args.verbose) {
       console.log("model:", this.model);
       if (this.model === "gpt-3.5-turbo-instruct") {
-        console.log(chatMessagesToInstructPrompt(messages));
+        console.log(chatMessagesToInstructPrompt({ messages }));
       } else {
         console.log(messages);
       }
@@ -420,7 +427,7 @@ export class Prompt<
         const stream = await streamText(
           config as any,
           config instanceof OpenAICompletionModel
-            ? chatMessagesToInstructPrompt(messages)
+            ? chatMessagesToInstructPrompt({ messages })
             : messages,
           { run: { abortSignal: args.abortSignal } }
         );
@@ -429,7 +436,7 @@ export class Prompt<
         const text = await generateText(
           config as any,
           config instanceof OpenAICompletionModel
-            ? chatMessagesToInstructPrompt(messages)
+            ? chatMessagesToInstructPrompt({ messages })
             : messages,
           { run: { abortSignal: args.abortSignal } }
         );

@@ -27,7 +27,7 @@ export const createInputSchema = () =>
             ChatMessage.system(`- Construct a Zod schema based on the text input.
 - The variables use the following syntax: \${vars.variableName}.
 - For each variable in the prompt, create a corresponding key in the schema
-- Translate each prompt variable into respective Zod schema data types and structure.
+- Translate each prompt variable into fields inside a Zod object schema.
 - Your replies should begin: z.object({`),
             ChatMessage.user(`Input text: ${this.getVariable("rawPrompt")}`),
           ];

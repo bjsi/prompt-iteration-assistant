@@ -8,6 +8,16 @@ import { edit } from "../prompts/actions";
 import { brainstormInputs } from "../prompts/brainstormInputs";
 import { sleep } from "openai/core";
 
+export function variablesMissingValues<Schema extends z.ZodObject<any>>(args: {
+  schema: Schema;
+  existingVariables?: Partial<z.infer<Schema>>;
+}) {
+  const variableKeysWithoutValues = (
+    Object.keys(args.schema.shape) as (keyof z.infer<Schema>)[]
+  ).filter((key) => !args.existingVariables?.[key]);
+  return variableKeysWithoutValues;
+}
+
 export async function getValuesForSchema<
   Schema extends z.ZodObject<any>
 >(args: {
@@ -22,9 +32,7 @@ export async function getValuesForSchema<
   const variables: Partial<z.infer<Schema>> = {
     ...(args.existingVariables || ({} as any)),
   };
-  const variableKeysWithoutValues = (
-    Object.keys(args.schema.shape) as (keyof z.infer<Schema>)[]
-  ).filter((key) => !variables[key]);
+  const variableKeysWithoutValues = variablesMissingValues(args);
   if (variableKeysWithoutValues.length) {
     console.log(
       `${chalk.green(args.name)} requires ${

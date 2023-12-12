@@ -8,16 +8,22 @@ export function createZodSchema(zodText: string): z.ZodObject<any> | undefined {
 const schema = ${zodText};
 return schema;
     `.trim();
+  try {
+    // todo: not sure if this is safe?
+    const createSchema = new Function("z", schemaCode);
+    const schema = createSchema(z);
 
-  // todo: not sure if this is safe?
-  const createSchema = new Function("z", schemaCode);
-  const schema = createSchema(z);
+    if (!(schema instanceof z.ZodObject)) {
+      console.log("Failed to convert text to a valid zod object schema");
+      console.log(schemaCode);
+      return undefined;
+    }
 
-  if (!(schema instanceof z.ZodObject)) {
-    console.log("Failed to convert text to zod schema");
+    return schema;
+  } catch (e) {
+    console.log("Failed to convert text to zod object schema");
+    console.log(e);
     console.log(schemaCode);
     return undefined;
   }
-
-  return schema;
 }

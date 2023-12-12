@@ -19,8 +19,8 @@ export function printMarkdownInBox(markdown: string, title?: string) {
   console.log(boxen(marked(markdown), { padding: 1, title }));
 }
 
-export function printPrompt(message: ChatMessage[]) {
-  const md = chatMessagesToInstructPrompt(message);
+export function printPrompt(messages: ChatMessage[]) {
+  const md = chatMessagesToInstructPrompt({ messages });
   printMarkdownInBox(md, chalk.green("Prompt"));
 }
 

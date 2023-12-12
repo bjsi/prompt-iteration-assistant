@@ -24,7 +24,7 @@ export const createOutputSchema = () =>
     input,
     model: "gpt-4",
     cliOptions: {
-      async getNextActions(prompt, initialMessages) {
+      async getNextActions(prompt) {
         return [
           edit({
             input: !prompt.state.schema
