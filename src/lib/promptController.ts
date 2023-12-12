@@ -1,7 +1,7 @@
 import chalk from "chalk";
-import { Prompt } from "../lib/prompt";
+import { Prompt } from "./prompt";
 import inquirer from "inquirer";
-import { CREATE_NEW_PROMPT, buildPrompt } from "./buildPrompt";
+import { CREATE_NEW_PROMPT, buildPrompt } from "../prompts/buildPrompt";
 
 /**
  * A container for all the prompts in your program.

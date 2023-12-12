@@ -16,7 +16,7 @@ import {
   CREATE_PROMPT_METADATA,
   createPromptMetadata,
 } from "./prompts/createPromptMetadata";
-import { PromptController } from "./prompts/promptController";
+import { PromptController } from "./lib/promptController";
 
 if (require.main === module) {
   const promptController = new PromptController({

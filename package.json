@@ -1,17 +1,24 @@
 {
   "name": "prompt-iteration-assistant",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "version": "0.0.1",
+  "description": "A set of CLI tools to help you iterate on your LLM prompts.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "LICENSE",
+    "README.md",
+    "package.json",
+    "CHANGELOG.md"
+  ],
   "scripts": {
-    "main": "npx tsx src/main.ts"
+    "main": "npx tsx src/main.ts",
+    "build": "bash scripts/build.sh"
   },
-  "author": "",
+  "author": "Jamesb",
   "license": "ISC",
   "dependencies": {
     "@inquirer/prompts": "^3.3.0",
-    "@types/marked-terminal": "^6.0.1",
-    "@types/node": "^20.10.4",
     "boxen": "^7.1.1",
     "chalk": "^4.1.2",
     "cli-highlight": "^2.1.11",
@@ -30,6 +37,8 @@
     "zod-to-json-schema": "^3.22.1"
   },
   "devDependencies": {
-    "@types/inquirer": "^9.0.7"
+    "@types/inquirer": "^9.0.7",
+    "@types/marked-terminal": "^6.0.1",
+    "@types/node": "^20.10.4"
   }
 }
