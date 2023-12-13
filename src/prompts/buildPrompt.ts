@@ -7,7 +7,7 @@ import {
 } from "../openai/messages";
 import inquirer from "inquirer";
 import * as _ from "remeda";
-import { edit } from "./actions";
+import { getUserInput, getInputFromEditor } from "./actions";
 import { ChatCompletionMessageParam } from "openai/resources";
 import {
   highlightJSON,
@@ -42,7 +42,6 @@ interface BuildPromptState {
 }
 
 export const CREATE_NEW_PROMPT = "New Prompt";
-
 export const DEFAULT_PROMPT_NAME = "New Prompt";
 export const DEFAULT_PROMPT_DESCRIPTION = "Prompt Description";
 
@@ -342,23 +341,26 @@ export const buildPrompt = (args?: {
               ]);
             },
           },
-          edit({
-            input: chatMessagesToInstructPrompt({
-              messages: prompt.state.currentPrompt?.prompts?.[0]
-                ?.raw()
-                .compile() || [ChatMessage.system("## Instructions:")],
-              attributes: {
-                name: prompt.state.currentPrompt?.name,
-                description: prompt.state.currentPrompt?.description,
-              },
-            }),
-            onSaved: async (updatedPrompt) => {
-              if (!updatedPrompt) {
+          {
+            name: "edit",
+            enabled: () => !!prompt.state.currentPrompt,
+            async action() {
+              if (!prompt.state.currentPrompt) {
                 return;
               }
-              await updateCurrentPrompt(updatedPrompt);
+              const currentPrompt = prompt.state.currentPrompt;
+              const editor = await getInputFromEditor({
+                input: chatMessagesToInstructPrompt({
+                  messages: currentPrompt.prompts[0].raw().compile(),
+                  attributes: {
+                    name: currentPrompt.name,
+                    description: currentPrompt.description,
+                  },
+                }),
+              });
+              await updateCurrentPrompt(editor);
             },
-          }),
+          },
           {
             name: "feedback",
             enabled: () => !!prompt.state.currentPrompt,
@@ -368,13 +370,9 @@ export const buildPrompt = (args?: {
               if (!prompt.state.currentPrompt) {
                 return;
               }
-              const answer = await inquirer.prompt([
-                {
-                  type: "input",
-                  name: "feedback",
-                  message: "Feedback for the prompt engineer:",
-                },
-              ]);
+              const feedback = await getUserInput({
+                message: "Feedback for the prompt engineer:",
+              });
               const messages: ChatCompletionMessageParam[] = [
                 ...prompt.prompts[0].compile(),
                 ChatMessage.assistant(
@@ -384,7 +382,7 @@ export const buildPrompt = (args?: {
                       .compile(),
                   })
                 ),
-                ChatMessage.user(answer.feedback),
+                ChatMessage.user(feedback),
               ];
 
               const controller = new AbortController();
@@ -423,6 +421,12 @@ export const buildPrompt = (args?: {
                   prompt.state.currentPrompt.output = schema;
                 }
               }
+            },
+          },
+          {
+            name: "back",
+            async action() {
+              prompt.cli();
             },
           },
           {

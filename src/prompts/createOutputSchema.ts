@@ -2,7 +2,7 @@ import { z } from "zod";
 import { Prompt } from "../lib/prompt";
 import { ChatMessage } from "../openai/messages";
 import highlight from "cli-highlight";
-import { edit } from "./actions";
+import { getInputFromEditor } from "./actions";
 import { CandidatePrompt } from "../lib/candidatePrompt";
 import { highlightTS } from "../helpers/printUtils";
 
@@ -26,15 +26,20 @@ export const createOutputSchema = () =>
     cliOptions: {
       async getNextActions(prompt) {
         return [
-          edit({
-            input: !prompt.state.schema
-              ? `
+          {
+            name: "edit",
+            async action() {
+              const output = await getInputFromEditor({
+                input: !prompt.state.schema
+                  ? `
 const output = z.object({
 
 });
 `.trim()
-              : prompt.state.schema.trim(),
-          }),
+                  : prompt.state.schema.trim(),
+              });
+            },
+          },
           { name: "save", async action() {} },
           {
             name: "quit",

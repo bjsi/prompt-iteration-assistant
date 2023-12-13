@@ -30,6 +30,10 @@ import { toCamelCase } from "../helpers/stringUtils";
 import chalk from "chalk";
 import { CandidatePrompt } from "./candidatePrompt";
 import { getValuesForSchema as askUserForValuesForSchema } from "./getValuesForSchema";
+import { CREATE_NEW_TEST } from "../prompts/createNewTest";
+import { sleep } from "openai/core";
+import { searchList } from "../prompts/actions";
+import { PromptController } from "./promptController";
 
 dotenv.config();
 inquirer.registerPrompt("search-list", searchlist);
@@ -101,7 +105,10 @@ interface PromptArgs<
    * Options to help you build CLI dialogs with the prompt.
    */
   cliOptions?: CLIOptions<InputSchema, OutputSchema, State>;
-
+  /**
+   * Prompt controller that this prompt is registered to if any.
+   */
+  promptController?: PromptController<any>;
   /**
    * Prompt state that is persisted between CLI dialog actions.
    * This is useful for storing messages and other data.
@@ -141,6 +148,8 @@ export class Prompt<
   model: OPENAI_CHAT_MODEL | OPENAI_INSTRUCT_MODEL;
   input?: InputSchema;
   output?: OutputSchema;
+
+  promptController?: PromptController<any> | undefined;
 
   temperature?: number;
   max_tokens?: number;
@@ -287,6 +296,7 @@ export class Prompt<
       }),
     ]);
     const program = new Command();
+
     program.option("-t, --test <name>", "run a test").parse(process.argv);
     program.option("-u, --ui <name>", "open webui").parse(process.argv);
     program.option("-r, --run", "run the prompt").parse(process.argv);
@@ -299,10 +309,15 @@ export class Prompt<
       const choices = _.compact([
         "run",
         this.tests.length > 0 && "test",
+        this.promptController && "back",
         "quit",
       ]);
 
-      if (choices.filter((x) => x !== "quit").length === 1 || mode === "run") {
+      if (
+        choices.filter((x) => !["quit", "back"].some((choice) => choice === x))
+          .length === 1 ||
+        mode === "run"
+      ) {
         await this.runLoop();
         return;
       } else {
@@ -328,28 +343,39 @@ export class Prompt<
             type: "search-list",
             name: "test",
             message: "Select a test:",
-            choices: ["all", ...this.tests.map((test) => test.description)],
+            choices: [
+              "all",
+              ...this.tests.map((test) => test.description),
+              CREATE_NEW_TEST,
+            ],
           },
         ]);
         if (test.test === "all") {
           await this.test();
+        } else if (test.test === CREATE_NEW_TEST) {
+          console.log("TODO: create new test");
+          await sleep(5_000);
+          this.cli();
         } else {
           await this.test(test.test);
         }
       } else if (answer.action === "run") {
         await this.runLoop();
+      } else if (answer.action === "back") {
+        this.promptController?.cli();
       } else {
         return;
       }
     }
   }
 
-  async test(name?: string) {
+  async test(args?: { name?: string }) {
+    const skipCache = await confirm("Skip cache?");
     const tests = this.tests.filter(
-      (test) => !name || test.description === name
+      (test) => !args?.name || test.description === args.name
     );
     if (!tests.length) {
-      console.log(`No test found with name "${name}"`);
+      console.log(`No test found`);
       return;
     }
     for (const test of tests) {
@@ -364,13 +390,29 @@ export class Prompt<
         {
           maxConcurrency: 2,
           showProgressBar: true,
+          cache: skipCache,
         }
       );
       for (let i = 0; i < results.table.head.prompts.length; i++) {
         const prompt = results.table.head.prompts[i];
         prompt.display = `Prompt: ${this.prompts[i].name}`;
       }
-      console.log(promptfoo.generateTable(results).toString());
+      console.log(promptfoo.generateTable(results, 4000).toString());
+      const choice = await searchList({
+        message: "Select an action:",
+        choices: ["run again", "edit", "back", "home", "quit"],
+      });
+      if (choice === "run again") {
+        await this.test(args);
+      } else if (choice === "edit") {
+        await this.cli("run");
+      } else if (choice === "back") {
+        await this.cli("test");
+      } else if (choice === "home") {
+        await this.cli();
+      } else if (choice === "quit") {
+        process.exit(0);
+      }
     }
   }
 
