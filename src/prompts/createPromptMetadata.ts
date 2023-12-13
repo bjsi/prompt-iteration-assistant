@@ -17,7 +17,7 @@ const output = z.object({
 export const CREATE_PROMPT_METADATA = "Create Prompt Metadata";
 
 export const createPromptMetadata = () =>
-  new Prompt<typeof input, undefined, CreatePromptMetadata>({
+  new Prompt<typeof input, typeof output, CreatePromptMetadata>({
     state: {},
     name: CREATE_PROMPT_METADATA,
     description: "Create metadata to describe the user's ChatGPT prompt.",
