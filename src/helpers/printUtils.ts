@@ -4,7 +4,6 @@ import { markedTerminal } from "marked-terminal";
 import { ChatCompletionMessageParam } from "openai/resources";
 import { ZodType } from "zod";
 import { capitalizeFirst, zodSchemaToInterface } from "./stringUtils";
-import boxen from "boxen";
 import highlight from "cli-highlight";
 import { ChatMessage, chatMessagesToInstructPrompt } from "../openai/messages";
 
@@ -15,8 +14,12 @@ export function printMarkdown(markdown: string) {
   console.log(marked(markdown));
 }
 
+export function markdownInBox(markdown: string, title?: string) {
+  return marked(`---\n${title}\n${markdown}\n---`);
+}
+
 export function printMarkdownInBox(markdown: string, title?: string) {
-  console.log(boxen(marked(markdown), { padding: 1, title }));
+  console.log(markdownInBox(markdown, title));
 }
 
 export function printPrompt(messages: ChatMessage[]) {
@@ -53,9 +56,7 @@ export const printChatMessages = (args: PrintChatMessagesArgs) => {
       .filter((message) => (hideSystem ? message.role !== "system" : true))
       .map((message) => {
         const role = chalk.green(capitalizeFirst(message.role));
-        return boxen(marked(message.content?.toString() || ""), {
-          title: role,
-        });
+        return markdownInBox(message.content?.toString() || "", role);
       })
       .join("\n\n")
   );

@@ -45,15 +45,23 @@ export class PromptController<
             name: k,
             value: k,
           }))
-          .concat({
-            name: CREATE_NEW_PROMPT,
-            value: CREATE_NEW_PROMPT,
-          }),
+          .concat([
+            {
+              name: CREATE_NEW_PROMPT,
+              value: CREATE_NEW_PROMPT,
+            },
+            {
+              name: "quit",
+              value: "quit",
+            },
+          ]),
       },
     ]);
 
     if (result.prompt === CREATE_NEW_PROMPT) {
       await buildPrompt().cli("run");
+    } else if (result.prompt === "quit") {
+      process.exit(0);
     } else {
       const prompt = this.getPrompt(result.prompt);
       const action = await inquirer.prompt([

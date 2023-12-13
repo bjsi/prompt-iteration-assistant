@@ -4,7 +4,7 @@ import { printZodSchema } from "../helpers/printUtils";
 import { toCamelCase, truncate } from "../helpers/stringUtils";
 import { ExampleDataSet } from "./prompt";
 import inquirer from "inquirer";
-import { edit } from "../prompts/actions";
+import { getInputFromEditor } from "../prompts/actions";
 import { brainstormInputs } from "../prompts/brainstormInputs";
 import { sleep } from "openai/core";
 
@@ -89,7 +89,7 @@ export async function getValuesForSchema<
       ]);
       variables[key] = answer[key];
     } else if (answer[key] === "edit value") {
-      const value = await edit({ input: "" }).action();
+      const value = await getInputFromEditor({ input: "" });
       console.log(value);
       variables[key] = value as any;
     } else if (answer[key] === "generate value") {
