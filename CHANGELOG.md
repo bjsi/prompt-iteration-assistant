@@ -1,3 +1,11 @@
+## 0.0.5
+
+- Fixed more ESM madness.
+
+## 0.0.4
+
+- Forgot to run build... :D
+
 ## 0.0.3
 
 - Fixed `package.json` to publish as commonjs.
