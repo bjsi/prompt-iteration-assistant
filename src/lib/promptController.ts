@@ -59,7 +59,7 @@ export class PromptController<
     ]);
 
     if (result.prompt === CREATE_NEW_PROMPT) {
-      await buildPrompt().cli("run");
+      await buildPrompt({ promptController: this }).cli("run");
     } else if (result.prompt === "quit") {
       process.exit(0);
     } else {
@@ -87,7 +87,9 @@ export class PromptController<
         // todo: what if the prompt requires args?
         await p.cli("test");
       } else {
+        console.log("improving...");
         const build = buildPrompt({
+          promptController: this,
           state: {
             currentPrompt: p,
           },

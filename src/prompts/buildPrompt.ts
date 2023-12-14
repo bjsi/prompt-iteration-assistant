@@ -31,6 +31,7 @@ import { createZodSchema } from "../helpers/zodUtils";
 import chalk from "chalk";
 import { substituteChatPromptVars } from "../lib/substitutePromptVars";
 import { variablesMissingValues } from "../lib/getValuesForSchema";
+import { PromptController } from "../lib/promptController";
 
 const input = z.object({
   goal: z.string(),
@@ -41,7 +42,7 @@ interface BuildPromptState {
   currentPrompt?: Prompt<any, any, any>;
 }
 
-export const CREATE_NEW_PROMPT = "New Prompt";
+export const CREATE_NEW_PROMPT = "Create New Prompt";
 export const DEFAULT_PROMPT_NAME = "New Prompt";
 export const DEFAULT_PROMPT_DESCRIPTION = "Prompt Description";
 
@@ -50,10 +51,12 @@ export const DEFAULT_PROMPT_DESCRIPTION = "Prompt Description";
  * It's a bit meta :)
  */
 export const buildPrompt = (args?: {
+  promptController?: PromptController<any>;
   state?: Partial<BuildPromptState>;
   vars?: Partial<z.infer<typeof input>>;
 }) =>
   new Prompt<typeof input, undefined, BuildPromptState>({
+    promptController: args?.promptController,
     state: args?.state || {},
     vars: args?.vars || {},
     name: CREATE_NEW_PROMPT,
@@ -426,7 +429,8 @@ export const buildPrompt = (args?: {
           {
             name: "back",
             async action() {
-              prompt.cli();
+              console.log("going back", prompt.name, prompt.promptController);
+              prompt.promptController?.cli();
             },
           },
           {

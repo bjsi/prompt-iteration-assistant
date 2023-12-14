@@ -176,6 +176,7 @@ export class Prompt<
     this.state = args.state;
     this.vars = args.vars || {};
     this.dontSuggestExampleData = args.dontSuggestExampleData;
+    this.promptController = args.promptController;
   }
 
   withTest = (
@@ -263,10 +264,10 @@ export class Prompt<
    * before calling the `nextAction` handler.
    */
   private runLoop = async () => {
-    // this.vars = await this.askUserForValuesForInputSchema();
+    let nextAction: (() => Promise<void>) | undefined = undefined;
     let nextActionName: string | undefined = undefined;
     console.clear();
-    while (nextActionName !== "done" && nextActionName !== "exit") {
+    while (true) {
       // get the list of nextActions from the prompt's cliOptions or provide default options
       const nextActions = await this.cliOptions?.getNextActions?.(this);
       const { action } = await inquirer.prompt([
@@ -278,11 +279,10 @@ export class Prompt<
         },
       ]);
       nextActionName = action;
-      if (nextActionName) {
-        const nextAction = nextActions?.find((x) => x.name === nextActionName);
-        if (nextAction) {
-          await nextAction.action();
-        }
+      nextAction = nextActions?.find((x) => x.name === nextActionName)?.action;
+      await nextAction?.();
+      if (["quit", "back"].some((choice) => choice === nextActionName)) {
+        break;
       }
     }
   };
