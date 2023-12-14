@@ -32,7 +32,7 @@ import { CandidatePrompt } from "./candidatePrompt";
 import { getValuesForSchema as askUserForValuesForSchema } from "./getValuesForSchema";
 import { CREATE_NEW_TEST } from "../prompts/createNewTest";
 import { sleep } from "openai/core";
-import { searchList } from "../prompts/actions";
+import { getInputFromCLI, searchList } from "../prompts/actions";
 import { PromptController } from "./promptController";
 import { confirm } from "../prompts/actions";
 
@@ -372,6 +372,8 @@ export class Prompt<
 
   async test(args?: { name?: string }) {
     const useCache = await confirm("Use cache?");
+    const repetitions =
+      parseInt(await getInputFromCLI("repetitions (default 1)")) || 1;
     const tests = this.tests.filter(
       (test) => !args?.name || test.description === args.name
     );
@@ -392,6 +394,7 @@ export class Prompt<
           maxConcurrency: 2,
           showProgressBar: true,
           cache: useCache,
+          repeat: repetitions,
         }
       );
       for (let i = 0; i < results.table.head.prompts.length; i++) {
