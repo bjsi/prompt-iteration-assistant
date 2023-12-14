@@ -34,6 +34,7 @@ import { CREATE_NEW_TEST } from "../prompts/createNewTest";
 import { sleep } from "openai/core";
 import { searchList } from "../prompts/actions";
 import { PromptController } from "./promptController";
+import { confirm } from "../prompts/actions";
 
 dotenv.config();
 inquirer.registerPrompt("search-list", searchlist);

@@ -1,3 +1,7 @@
+## 0.0.6
+
+- Fix bug where `confirm` function was undefined.
+
 ## 0.0.5
 
 - Fixed more ESM madness.
