@@ -358,7 +358,7 @@ export class Prompt<
           await sleep(5_000);
           this.cli();
         } else {
-          await this.test(test.test);
+          await this.test({ name: test.test });
         }
       } else if (answer.action === "run") {
         await this.runLoop();
@@ -371,7 +371,7 @@ export class Prompt<
   }
 
   async test(args?: { name?: string }) {
-    const skipCache = await confirm("Skip cache?");
+    const useCache = await confirm("Use cache?");
     const tests = this.tests.filter(
       (test) => !args?.name || test.description === args.name
     );
@@ -391,7 +391,7 @@ export class Prompt<
         {
           maxConcurrency: 2,
           showProgressBar: true,
-          cache: skipCache,
+          cache: useCache,
         }
       );
       for (let i = 0; i < results.table.head.prompts.length; i++) {

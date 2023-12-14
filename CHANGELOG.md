@@ -1,3 +1,8 @@
+## 0.0.7
+
+- Fix running tests by name not working.
+- Changed `skipCache` to `useCache` with default of `true` in `test` function.
+
 ## 0.0.6
 
 - Fix bug where `confirm` function was undefined.
