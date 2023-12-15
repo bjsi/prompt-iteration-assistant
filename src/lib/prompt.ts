@@ -401,7 +401,7 @@ export class Prompt<
         const prompt = results.table.head.prompts[i];
         prompt.display = `Prompt: ${this.prompts[i].name}`;
       }
-      console.log(promptfoo.generateTable(results, 4000).toString());
+      console.log(promptfoo.generateTable(results).toString());
       const choice = await searchList({
         message: "Select an action:",
         choices: ["run again", "edit", "back", "home", "quit"],
