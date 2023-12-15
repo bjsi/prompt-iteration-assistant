@@ -1,3 +1,9 @@
+## 0.0.8
+
+- Fix test results table not showing up.
+- Fix back command in CLI dialogs.
+- Allow repeating tests.
+
 ## 0.0.7
 
 - Fix running tests by name not working.
