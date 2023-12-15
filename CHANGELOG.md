@@ -1,3 +1,7 @@
+## 0.0.9
+
+- Fix test results table cell length limit.
+
 ## 0.0.8
 
 - Fix test results table not showing up.

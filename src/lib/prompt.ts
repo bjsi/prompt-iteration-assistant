@@ -35,6 +35,7 @@ import { sleep } from "openai/core";
 import { getInputFromCLI, searchList } from "../prompts/actions";
 import { PromptController } from "./promptController";
 import { confirm } from "../prompts/actions";
+import { generateTable } from "../promptfoo/generateTable";
 
 dotenv.config();
 inquirer.registerPrompt("search-list", searchlist);
@@ -401,7 +402,13 @@ export class Prompt<
         const prompt = results.table.head.prompts[i];
         prompt.display = `Prompt: ${this.prompts[i].name}`;
       }
-      console.log(promptfoo.generateTable(results).toString());
+      console.log(
+        generateTable(
+          results,
+          Number.MAX_SAFE_INTEGER,
+          Number.MAX_SAFE_INTEGER
+        ).toString()
+      );
       const choice = await searchList({
         message: "Select an action:",
         choices: ["run again", "edit", "back", "home", "quit"],
