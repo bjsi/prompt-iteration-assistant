@@ -402,13 +402,11 @@ export class Prompt<
         const prompt = results.table.head.prompts[i];
         prompt.display = `Prompt: ${this.prompts[i].name}`;
       }
-      console.log(
-        generateTable(
-          results,
-          Number.MAX_SAFE_INTEGER,
-          Number.MAX_SAFE_INTEGER
-        ).toString()
-      );
+      generateTable(
+        results,
+        Number.MAX_SAFE_INTEGER,
+        Number.MAX_SAFE_INTEGER
+      ).render();
       const choice = await searchList({
         message: "Select an action:",
         choices: ["run again", "edit", "back", "home", "quit"],
