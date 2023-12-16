@@ -1,3 +1,7 @@
+## 0.0.10
+
+- More CLI table fixes.
+
 ## 0.0.9
 
 - Fix test results table cell length limit.
