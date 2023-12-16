@@ -1,3 +1,7 @@
+## 0.0.12
+
+- More CLI table fixes.
+
 ## 0.0.11
 
 - More CLI table fixes.
