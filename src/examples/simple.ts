@@ -2,26 +2,30 @@ import { z } from "zod";
 import { Prompt } from "../lib/prompt";
 import { ChatMessage } from "../openai/messages";
 import { CandidatePrompt } from "../lib/candidatePrompt";
+import { PromptController } from "../lib/promptController";
 
 const input = z.object({
   projectTitle: z.string(),
+});
+
+type BrainstormIdeasInput = z.infer<typeof input>;
+
+const output = z.object({
+  ideas: z.array(z.string()),
 });
 
 export const BRAINSTORM_IDEAS = "Brainstorm Ideas";
 
 export const brainstormIdeas = () =>
   new Prompt({
-    state: {},
     name: BRAINSTORM_IDEAS,
     description: "Brainstorm ideas for a new project",
     input,
-    output: z.object({
-      ideas: z.array(z.string()),
-    }),
+    output,
     model: "gpt-4",
     max_tokens: 100,
     prompts: [
-      new CandidatePrompt<z.infer<typeof input>>({
+      new CandidatePrompt<BrainstormIdeasInput>({
         name: "basic",
         compile: function () {
           return [
@@ -31,4 +35,13 @@ export const brainstormIdeas = () =>
         },
       }),
     ],
+  }).withTest("test 1", {
+    projectTitle: "ChatGPT",
   });
+
+if (require.main === module) {
+  const controller = new PromptController({
+    [BRAINSTORM_IDEAS]: brainstormIdeas,
+  });
+  controller.cli();
+}
