@@ -3,7 +3,7 @@ import { marked } from "marked";
 import { markedTerminal } from "marked-terminal";
 import { ChatCompletionMessageParam } from "openai/resources";
 import { ZodType } from "zod";
-import { capitalizeFirst, zodSchemaToInterface } from "./stringUtils";
+import { capitalizeFirst, zodSchemaToInterface } from "./string";
 import highlight from "cli-highlight";
 import { ChatMessage, chatMessagesToInstructPrompt } from "../openai/messages";
 
