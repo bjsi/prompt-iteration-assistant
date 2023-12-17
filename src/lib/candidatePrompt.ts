@@ -67,6 +67,9 @@ export class CandidatePrompt<Variables extends {}> {
     return this;
   }
 
+  /**
+   * Run `prompt.raw().compile()` to get the raw version of the prompt without the ${variables} filled in.
+   */
   raw() {
     // need to make a copy of the prompt so that we don't mutate the original
     return new CandidatePrompt<Variables>({
@@ -76,6 +79,9 @@ export class CandidatePrompt<Variables extends {}> {
     });
   }
 
+  /**
+   * Gets all of the ${variableName} placeholders in the prompt as a list.
+   */
   getAllVariablePlaceholders() {
     const messages = this.raw().compile();
     const asString = chatMessagesToInstructPrompt({ messages });
@@ -89,7 +95,7 @@ export class CandidatePrompt<Variables extends {}> {
    * It's useful to have access to the raw version of the prompt without the variables
    * filled in by the string interpolation because we can pass the raw prompt to GPT eg.
    * to generate a new prompt based on the current prompt. This allows us to keep the
-   * type safety benefits of using string interpolation but also get the raw string version :)
+   * type safety benefits of using string interpolation but also get the raw string version.
    */
   getVariable<K extends keyof Variables>(key: K) {
     if (this._raw) {

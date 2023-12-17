@@ -3,11 +3,11 @@ import { Prompt } from "../lib/prompt";
 import { ChatMessage } from "../openai/messages";
 import { CandidatePrompt } from "../lib/candidatePrompt";
 
-interface CreatePromptMetadata {}
-
 const input = z.object({
   prompt: z.string(),
 });
+
+type CreatePromptMetadataInput = z.infer<typeof input>;
 
 const output = z.object({
   name: z.string(),
@@ -17,15 +17,14 @@ const output = z.object({
 export const CREATE_PROMPT_METADATA = "Create Prompt Metadata";
 
 export const createPromptMetadata = () =>
-  new Prompt<typeof input, typeof output, CreatePromptMetadata>({
-    state: {},
+  new Prompt({
     name: CREATE_PROMPT_METADATA,
     description: "Create metadata to describe the user's ChatGPT prompt.",
     input,
     output,
     model: "gpt-4",
     prompts: [
-      new CandidatePrompt<z.infer<typeof input>>({
+      new CandidatePrompt<CreatePromptMetadataInput>({
         name: "basic",
         compile: function () {
           return [

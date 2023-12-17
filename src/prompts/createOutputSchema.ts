@@ -1,12 +1,11 @@
 import { z } from "zod";
 import { Prompt } from "../lib/prompt";
 import { ChatMessage } from "../openai/messages";
-import highlight from "cli-highlight";
-import { getInputFromEditor } from "./actions";
+import { getInputFromEditor } from "../dialogs/actions";
 import { CandidatePrompt } from "../lib/candidatePrompt";
-import { highlightTS } from "../helpers/printUtils";
+import { highlightTS } from "../helpers/print";
 
-interface CreateSchemaState {
+export interface CreateSchemaState {
   schema?: string;
 }
 
@@ -16,11 +15,10 @@ const input = z.object({
 
 export const CREATE_OUTPUT_SCHEMA = "Create Output Schema";
 
-export const createOutputSchema = () =>
-  new Prompt<typeof input, undefined, CreateSchemaState>({
+export const createOutputSchema = (state: CreateSchemaState) => {
+  return new Prompt({
     name: CREATE_OUTPUT_SCHEMA,
     description: `Imagine the user's ChatGPT prompt was a function. Create a Zod schema to describe the return type of the prompt.`,
-    state: {},
     input,
     model: "gpt-4",
     cliOptions: {
@@ -30,13 +28,13 @@ export const createOutputSchema = () =>
             name: "edit",
             async action() {
               const output = await getInputFromEditor({
-                input: !prompt.state.schema
+                input: !state.schema
                   ? `
 const output = z.object({
 
 });
 `.trim()
-                  : prompt.state.schema.trim(),
+                  : state.schema.trim(),
               });
             },
           },
@@ -86,3 +84,4 @@ ${this.getVariable("prompt")}
     ],
     exampleData: [],
   });
+};

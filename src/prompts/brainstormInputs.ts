@@ -14,7 +14,6 @@ export const brainstormInputs = (
   inputSchema?: ZodObject<any>
 ) =>
   new Prompt({
-    state: {},
     name: BRAINSTORM_INPUTS,
     description: "Brainstorm inputs to a ChatGPT prompt.",
     input,

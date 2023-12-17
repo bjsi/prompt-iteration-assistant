@@ -1,5 +1,5 @@
 import { Chat } from "openai/resources";
-import { printChatMessages, printMarkdown } from "../helpers/printUtils";
+import { printChatMessages, printMarkdown } from "../helpers/print";
 import { ChatMessage } from "./messages";
 import * as _ from "remeda";
 import { generateText, openai, streamText } from "modelfusion";

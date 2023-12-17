@@ -1,6 +1,6 @@
 {
   "name": "prompt-iteration-assistant",
-  "version": "0.0.12",
+  "version": "0.0.13",
   "description": "A set of CLI tools to help you iterate on your LLM prompts.",
   "main": "./dist/index.js",
   "types": "dist/index.d.ts",
@@ -13,7 +13,8 @@
   ],
   "scripts": {
     "main": "npx tsx src/main.ts",
-    "build": "bash scripts/build.sh"
+    "build": "bash scripts/build.sh",
+    "example:simple": "npx tsx src/examples/simple.ts"
   },
   "author": "Jamesb",
   "license": "ISC",

@@ -9,6 +9,7 @@ import searchlist from "inquirer-search-list";
 import dotenv from "dotenv";
 import { OPENAI_CHAT_MODEL, OPENAI_INSTRUCT_MODEL } from "../openai/models";
 import {
+  customTestOptions,
   functionCallTestOptions,
   plainTextTestOptions,
 } from "../promptfoo/options";
@@ -26,15 +27,15 @@ import {
   streamText,
 } from "modelfusion";
 import * as _ from "remeda";
-import { toCamelCase } from "../helpers/stringUtils";
+import { toCamelCase } from "../helpers/string";
 import chalk from "chalk";
 import { CandidatePrompt } from "./candidatePrompt";
 import { getValuesForSchema as askUserForValuesForSchema } from "./getValuesForSchema";
 import { CREATE_NEW_TEST } from "../prompts/createNewTest";
 import { sleep } from "openai/core";
-import { getInputFromCLI, searchList } from "../prompts/actions";
+import { getInputFromCLI, searchList } from "../dialogs/actions";
 import { PromptController } from "./promptController";
-import { confirm } from "../prompts/actions";
+import { confirm } from "../dialogs/actions";
 import { generateTable } from "../promptfoo/generateTable";
 
 dotenv.config();
@@ -55,20 +56,18 @@ export interface Action<Output> {
 
 export interface CLIOptions<
   InputSchema extends ZodObject<any>,
-  OutputSchema extends ZodType | undefined = undefined,
-  State extends {} = Record<string, any>
+  OutputSchema extends ZodType<any>
 > {
   formatChatMessage?: (message: ChatCompletionMessageParam) => any;
   inputKeyToCLIPrompt?: (key: keyof z.infer<InputSchema>) => string;
   getNextActions?: (
-    prompt: Prompt<InputSchema, OutputSchema, State>
+    prompt: Prompt<InputSchema, OutputSchema>
   ) => Promise<Action<any>[]>;
 }
 
-interface PromptArgs<
-  InputSchema extends ZodObject<any> = ZodObject<any>,
-  OutputSchema extends ZodType | undefined = undefined,
-  State extends {} = Record<string, any>
+export interface PromptArgs<
+  InputSchema extends ZodObject<any>,
+  OutputSchema extends ZodType<any>
 > {
   /**
    * The human readable name of the prompt.
@@ -106,17 +105,11 @@ interface PromptArgs<
   /**
    * Options to help you build CLI dialogs with the prompt.
    */
-  cliOptions?: CLIOptions<InputSchema, OutputSchema, State>;
+  cliOptions?: CLIOptions<InputSchema, OutputSchema>;
   /**
    * Prompt controller that this prompt is registered to if any.
    */
   promptController?: PromptController<any>;
-  /**
-   * Prompt state that is persisted between CLI dialog actions.
-   * This is useful for storing messages and other data.
-   */
-  state: State;
-
   /**
    * Initial values for the prompt's input variables.
    * Partial because the user can fill in the rest of the values in the CLI dialog.
@@ -131,15 +124,17 @@ interface PromptArgs<
   max_tokens?: number;
 }
 
+export type PromptInput = ZodObject<any>;
+export type PromptOutput = ZodType<any>;
+
 export class Prompt<
-  InputSchema extends ZodObject<any>,
-  OutputSchema extends ZodType | undefined = undefined,
-  State extends {} = Record<string, any>
-> implements PromptArgs<InputSchema, OutputSchema, State>
+  InputSchema extends PromptInput,
+  OutputSchema extends PromptOutput
+> implements PromptArgs<InputSchema, OutputSchema>
 {
   name: string;
   description?: string;
-  cliOptions?: CLIOptions<InputSchema, OutputSchema, State>;
+  cliOptions?: CLIOptions<InputSchema, OutputSchema>;
 
   prompts: CandidatePrompt<z.infer<InputSchema>>[];
   /**
@@ -156,13 +151,12 @@ export class Prompt<
   temperature?: number;
   max_tokens?: number;
 
-  state: State;
   vars: Partial<z.infer<InputSchema>> = {};
 
   private extraMessages: ChatCompletionMessageParam[] = [];
   private tests: promptfoo.EvaluateTestSuite[] = [];
 
-  constructor(args: PromptArgs<InputSchema, OutputSchema, State>) {
+  constructor(args: PromptArgs<InputSchema, OutputSchema>) {
     this.name = args.name;
     this.output = args.output;
     this.input = args.input;
@@ -174,27 +168,32 @@ export class Prompt<
     this.model = args.model;
     this.exampleData = args.exampleData || [];
     this.cliOptions = args.cliOptions;
-    this.state = args.state;
     this.vars = args.vars || {};
     this.dontSuggestExampleData = args.dontSuggestExampleData;
     this.promptController = args.promptController;
   }
 
-  withTest = (
-    name: string,
-    promptVars: z.infer<InputSchema>,
-    ...asserts: ((
+  private createTest = <Input extends Record<string, any>>(args: {
+    name: string;
+    vars: Input;
+    customRunFunction?: (vars: Input) => Promise<string | object | undefined>;
+    assertions: ((
       output: OutputSchema extends ZodType<infer U> ? U : string | null
     ) => {
       pass: boolean;
       score: number;
       reason: string;
-    })[]
-  ) => {
-    const options = this.output
+    })[];
+  }) => {
+    const options = args.customRunFunction
+      ? customTestOptions({
+          prompts: this.prompts.map((prompt) => prompt.raw().compile()),
+          callApi: args.customRunFunction,
+        })
+      : this.output
       ? functionCallTestOptions({
           prompts: this.prompts.map((prompt) =>
-            prompt.withVariables(promptVars).compile()
+            prompt.withVariables(args.vars).compile()
           ),
           functions: [
             {
@@ -207,24 +206,30 @@ export class Prompt<
         })
       : plainTextTestOptions({
           prompts: this.prompts.map((prompt) =>
-            prompt.withVariables(promptVars).compile()
+            prompt.withVariables(args.vars).compile()
           ),
           model: this.model,
         });
     const defaultAsserts = this.output ? [assertValidSchema(this.output)] : [];
     const test: promptfoo.EvaluateTestSuite = {
       ...options,
-      description: name,
+      description: args.name,
       tests: [
         {
           vars: {
-            ...promptVars,
+            ...args.vars,
           },
           assert: [
             ...defaultAsserts,
             ...(this.output
-              ? asserts.map((a) => assertJSON(this.output!, a))
-              : asserts.map((a) => ({
+              ? args.assertions.map((a) =>
+                  assertJSON(
+                    // @ts-ignore
+                    this.output!,
+                    a
+                  )
+                )
+              : args.assertions.map((a) => ({
                   type: "javascript" as const,
                   value: (output: string) => {
                     return a(output as any);
@@ -234,7 +239,43 @@ export class Prompt<
         },
       ],
     };
+    return test;
+  };
 
+  withCustomTest = <
+    Input extends Record<string, string | object>,
+    Output extends string | object | undefined
+  >(
+    name: string,
+    fn: (this: typeof this, args: Input) => Promise<Output>,
+    vars: Input
+  ) => {
+    const test = this.createTest({
+      name,
+      vars,
+      customRunFunction: fn.bind(this),
+      assertions: [],
+    });
+    this.tests.push(test);
+    return this;
+  };
+
+  withTest = (
+    name: string,
+    vars: z.infer<InputSchema>,
+    ...assertions: ((
+      output: OutputSchema extends ZodType<infer U> ? U : string | null
+    ) => {
+      pass: boolean;
+      score: number;
+      reason: string;
+    })[]
+  ) => {
+    const test = this.createTest({
+      name,
+      vars,
+      assertions,
+    });
     this.tests.push(test);
     return this;
   };

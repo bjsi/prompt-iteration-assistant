@@ -1,5 +1,6 @@
 import { ChatCompletionMessageParam } from "openai/resources";
 import { OPENAI_CHAT_MODEL, OPENAI_INSTRUCT_MODEL } from "../openai/models";
+import { ProviderResponse, TestSuite, TestSuiteConfig } from "promptfoo";
 
 export const plainTextTestOptions = (opts: {
   prompts: ChatCompletionMessageParam[][];
@@ -34,6 +35,22 @@ export const functionCallTestOptions = (opts: {
       options: {
         postprocess: "JSON.stringify(JSON.parse(output.arguments), null, 2)",
       },
+    },
+  };
+};
+
+export const customTestOptions = <Input extends Record<string, any>>(opts: {
+  prompts: ChatCompletionMessageParam[][];
+  callApi: (input: Input) => Promise<string | object | undefined>;
+}) => {
+  return {
+    prompts: opts.prompts.map((p) => JSON.stringify(p)),
+    providers: async (_: string, ctx?: { vars: Input }) => {
+      if (!ctx?.vars) throw new Error("vars not defined");
+      const output = await opts.callApi(ctx?.vars);
+      return {
+        output,
+      };
     },
   };
 };

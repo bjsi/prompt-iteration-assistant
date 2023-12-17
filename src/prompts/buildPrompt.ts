@@ -7,7 +7,7 @@ import {
 } from "../openai/messages";
 import inquirer from "inquirer";
 import * as _ from "remeda";
-import { getUserInput, getInputFromEditor } from "./actions";
+import { getUserInput, getInputFromEditor } from "../dialogs/actions";
 import { ChatCompletionMessageParam } from "openai/resources";
 import {
   highlightJSON,
@@ -16,18 +16,18 @@ import {
   printMarkdownInBox,
   printPrompt,
   printZodSchema,
-} from "../helpers/printUtils";
+} from "../helpers/print";
 import {
   generateConcurrently,
   generateTextConcurrently,
 } from "../openai/runConcurrent";
-import { createOutputSchema } from "./createOutputSchema";
-import { toCamelCase } from "../helpers/stringUtils";
+import { CreateSchemaState, createOutputSchema } from "./createOutputSchema";
+import { toCamelCase } from "../helpers/string";
 import { sleep } from "openai/core";
 import { writeFileSync } from "fs";
 import { createInputSchema } from "./createInputSchema";
 import { CandidatePrompt } from "../lib/candidatePrompt";
-import { createZodSchema } from "../helpers/zodUtils";
+import { createZodSchema } from "../helpers/zod";
 import chalk from "chalk";
 import { substituteChatPromptVars } from "../lib/substitutePromptVars";
 import { variablesMissingValues } from "../lib/getValuesForSchema";
@@ -39,7 +39,7 @@ const input = z.object({
 
 interface BuildPromptState {
   feedback?: ChatCompletionMessageParam[];
-  currentPrompt?: Prompt<any, any, any>;
+  currentPrompt?: Prompt<any, any>;
 }
 
 export const CREATE_NEW_PROMPT = "Create New Prompt";
@@ -54,10 +54,10 @@ export const buildPrompt = (args?: {
   promptController?: PromptController<any>;
   state?: Partial<BuildPromptState>;
   vars?: Partial<z.infer<typeof input>>;
-}) =>
-  new Prompt<typeof input, undefined, BuildPromptState>({
+}) => {
+  const state: BuildPromptState = { ...args?.state };
+  return new Prompt({
     promptController: args?.promptController,
-    state: args?.state || {},
     vars: args?.vars || {},
     name: CREATE_NEW_PROMPT,
     description: "Create a ChatGPT prompt to solve the user's task",
@@ -66,7 +66,7 @@ export const buildPrompt = (args?: {
     cliOptions: {
       getNextActions: async (prompt) => {
         console.clear();
-        const curPrompt = prompt.state.currentPrompt;
+        const curPrompt = state.currentPrompt;
         if (curPrompt) {
           if (curPrompt.input) {
             await printZodSchema({
@@ -95,17 +95,16 @@ export const buildPrompt = (args?: {
         }
 
         const updateCurrentPrompt = async (newPromptText: string) => {
-          const oldPrompt = prompt.state.currentPrompt?.prompts[0];
-          if (!prompt.state.currentPrompt) {
-            prompt.state.currentPrompt = new Prompt({
-              state: {},
+          const oldPrompt = state.currentPrompt?.prompts[0];
+          if (!state.currentPrompt) {
+            state.currentPrompt = new Prompt({
               name: DEFAULT_PROMPT_NAME,
               description: DEFAULT_PROMPT_DESCRIPTION,
               model: "gpt-4",
               prompts: [],
             });
           }
-          const curPrompt = prompt.state.currentPrompt;
+          const curPrompt = state.currentPrompt;
           const newPromptMessages = instructPromptToChatMessages(newPromptText);
           curPrompt.prompts[0] = new CandidatePrompt({
             name: "generated",
@@ -265,9 +264,9 @@ export const buildPrompt = (args?: {
           },
           {
             name: "test run",
-            enabled: () => !!prompt.state.currentPrompt,
+            enabled: () => !!state.currentPrompt,
             action: async () => {
-              const currentPrompt = prompt.state.currentPrompt;
+              const currentPrompt = state.currentPrompt;
               if (!currentPrompt) {
                 return;
               }
@@ -346,12 +345,12 @@ export const buildPrompt = (args?: {
           },
           {
             name: "edit",
-            enabled: () => !!prompt.state.currentPrompt,
+            enabled: () => !!state.currentPrompt,
             async action() {
-              if (!prompt.state.currentPrompt) {
+              if (!state.currentPrompt) {
                 return;
               }
-              const currentPrompt = prompt.state.currentPrompt;
+              const currentPrompt = state.currentPrompt;
               const editor = await getInputFromEditor({
                 input: chatMessagesToInstructPrompt({
                   messages: currentPrompt.prompts[0].raw().compile(),
@@ -366,11 +365,11 @@ export const buildPrompt = (args?: {
           },
           {
             name: "feedback",
-            enabled: () => !!prompt.state.currentPrompt,
+            enabled: () => !!state.currentPrompt,
             async action() {
               // TODO: check this.vars
 
-              if (!prompt.state.currentPrompt) {
+              if (!state.currentPrompt) {
                 return;
               }
               const feedback = await getUserInput({
@@ -380,9 +379,7 @@ export const buildPrompt = (args?: {
                 ...prompt.prompts[0].compile(),
                 ChatMessage.assistant(
                   chatMessagesToInstructPrompt({
-                    messages: prompt.state.currentPrompt.prompts[0]
-                      .raw()
-                      .compile(),
+                    messages: state.currentPrompt.prompts[0].raw().compile(),
                   })
                 ),
                 ChatMessage.user(feedback),
@@ -410,18 +407,19 @@ export const buildPrompt = (args?: {
           },
           {
             name: "output schema",
-            enabled: () => !!prompt.state.currentPrompt,
+            enabled: () => !!state.currentPrompt,
             action: async () => {
-              if (!prompt.state.currentPrompt) {
+              if (!state.currentPrompt) {
                 return;
               }
-              const outputSchemaPrompt = createOutputSchema();
+              const outputSchemaState: CreateSchemaState = {};
+              const outputSchemaPrompt = createOutputSchema(outputSchemaState);
               await outputSchemaPrompt.cli("run");
-              const outputSchemaText = outputSchemaPrompt.state.schema;
+              const outputSchemaText = outputSchemaState.schema;
               if (outputSchemaText) {
                 const schema = createZodSchema(outputSchemaText);
                 if (schema) {
-                  prompt.state.currentPrompt.output = schema;
+                  state.currentPrompt.output = schema;
                 }
               }
             },
@@ -435,7 +433,7 @@ export const buildPrompt = (args?: {
           },
           {
             name: "save",
-            enabled: () => !!prompt.state.currentPrompt,
+            enabled: () => !!state.currentPrompt,
             async action() {
               const name = "New Prompt";
               const description = "Prompt Description";
@@ -444,15 +442,15 @@ export const buildPrompt = (args?: {
               const code = `
 import { z } from "zod";
 
-${prompt.state.currentPrompt?.input || ""}
+${state.currentPrompt?.input || ""}
 
-${prompt.state.currentPrompt?.output || ""}
+${state.currentPrompt?.output || ""}
 
 interface ${name.replace(/ /g, "")}State { }
 
 export const ${toCamelCase(name)} = new Prompt<
   typeof input,
-  ${prompt.state.currentPrompt?.output ? "typeof output" : "undefined"},
+  ${state.currentPrompt?.output ? "typeof output" : "undefined"},
   ${toCamelCase(name)}State
 >({
   state: {},
@@ -464,7 +462,7 @@ export const ${toCamelCase(name)} = new Prompt<
     {
       name: "new",
       compile: (vars) => [
-        ChatMessage.system(\`${prompt.state.currentPrompt}\`)
+        ChatMessage.system(\`${state.currentPrompt}\`)
       ]
     }
   ],
@@ -549,6 +547,7 @@ if (require.main === module) {
       },
     ],
   });
+};
 
 if (require.main === module) {
   const bp = buildPrompt();

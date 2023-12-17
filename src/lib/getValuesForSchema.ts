@@ -1,10 +1,10 @@
 import chalk from "chalk";
 import { z } from "zod";
-import { printZodSchema } from "../helpers/printUtils";
-import { toCamelCase, truncate } from "../helpers/stringUtils";
+import { printZodSchema } from "../helpers/print";
+import { toCamelCase, truncate } from "../helpers/string";
 import { ExampleDataSet } from "./prompt";
 import inquirer from "inquirer";
-import { getInputFromEditor } from "../prompts/actions";
+import { getInputFromEditor } from "../dialogs/actions";
 import { brainstormInputs } from "../prompts/brainstormInputs";
 import { sleep } from "openai/core";
 

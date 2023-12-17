@@ -5,9 +5,17 @@ import { CREATE_NEW_PROMPT, buildPrompt } from "../prompts/buildPrompt";
 
 /**
  * A container for all the prompts in your program.
+ *
+ * Example:
+ * ```ts
+ * const promptController = new PromptController({
+ *   [BRAINSTORM_IDEAS]: brainstormInputs,
+ * });
+ * promptController.cli();
+ * ```
  */
 export class PromptController<
-  Prompts extends Record<string, (...args: any[]) => Prompt<any, any, any>>
+  Prompts extends Record<string, (...args: any[]) => Prompt<any, any>>
 > {
   private prompts: Prompts;
 

@@ -3,17 +3,14 @@ import { Prompt } from "../lib/prompt";
 import { ChatMessage } from "../openai/messages";
 import { CandidatePrompt } from "../lib/candidatePrompt";
 
-interface CreateInputSchemaState {}
-
 const input = z.object({
   rawPrompt: z.string(),
 });
 
 export const CREATE_INPUT_SCHEMA = "Create Input Schema";
 
-export const createInputSchema = () =>
-  new Prompt<typeof input, undefined, CreateInputSchemaState>({
-    state: {},
+export const createInputSchema = () => {
+  return new Prompt({
     name: CREATE_INPUT_SCHEMA,
     description:
       "Create a Zod schema based on the variables in the text input.",
@@ -36,3 +33,11 @@ export const createInputSchema = () =>
     ],
     exampleData: [],
   });
+};
+
+const x = createInputSchema().run({
+  promptVariables: {
+    rawPrompt: "Please write a greeting message for ${name}.",
+  },
+  stream: false,
+});
