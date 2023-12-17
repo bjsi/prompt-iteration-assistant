@@ -1,3 +1,9 @@
+## 0.0.13
+
+- Remove required `state` field from the `Prompt` class.
+- Improve typing.
+- Add support for custom prompt run function in tests. See `prompt.withCustomTest`.
+
 ## 0.0.12
 
 - More CLI table fixes.
