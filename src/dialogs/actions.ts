@@ -6,11 +6,14 @@ import {
 } from "../openai/messages";
 import inquirer from "inquirer";
 
-export const searchList = async (args: {
+/**
+ * Presents a list of choices to the user and returns the selected choice
+ */
+export const searchList = async <T extends string>(args: {
   message: string;
-  choices: string[];
+  choices: T[];
   default?: string;
-}) => {
+}): Promise<T> => {
   const { message, choices, default: def } = args;
   const res = await inquirer.prompt([
     {
@@ -24,15 +27,22 @@ export const searchList = async (args: {
   return res.choice;
 };
 
+/**
+ * @returns true if the user confirms, false otherwise
+ */
 export const confirm = async (message: string) => {
   const res = await inquirer.prompt({
     name: "confirm",
     message: message,
     type: "confirm",
   });
-  return res.confirm;
+  return !!res.confirm;
 };
 
+/**
+ * Allows the user to select an input method and returns the input.
+ * Supports CLI input and editor input using the user's `$EDITOR` env var.
+ */
 export const getUserInput = async (args: {
   message?: string;
   input?: string;
@@ -63,6 +73,9 @@ export const getInputFromCLI = async (message: string) => {
   return res.input as string;
 };
 
+/**
+ * Opens the user's `$EDITOR` and returns the input.
+ */
 export const getInputFromEditor = async <
   T extends string | ChatMessagesWithAttributes
 >(args: {
