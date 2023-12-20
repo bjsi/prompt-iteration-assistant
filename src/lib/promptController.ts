@@ -71,7 +71,9 @@ export class PromptController<
     } else if (result.prompt === "quit") {
       process.exit(0);
     } else {
-      const prompt = this.getPrompt(result.prompt);
+      // todo: what if the prompt requires args?
+      const prompt = this.getPrompt(result.prompt)();
+      const customCmds = prompt.commands || [];
       const action = await inquirer.prompt([
         {
           type: "search-list",
@@ -86,27 +88,31 @@ export class PromptController<
               name: "test",
               value: "test",
             },
+            ...customCmds.map((cmd) => ({
+              name: cmd.name,
+              value: cmd.name,
+            })),
           ],
         },
       ]);
 
-      const p = prompt();
       if (action.action === "test") {
-        // todo: what if the prompt requires args?
-        await p.cli("test");
-      } else {
+        await prompt.cli("test");
+      } else if (action.action === "improve") {
         console.log("improving...");
         const build = buildPrompt({
           promptController: this,
           state: {
-            currentPrompt: p,
+            currentPrompt: prompt,
           },
           vars: {
-            goal: p.description,
+            goal: prompt.description,
           },
         });
         await build.cli("run");
-        // then update vars and save
+      } else if (customCmds.find((cmd) => cmd.name === action.action)) {
+        const cmd = customCmds.find((cmd) => cmd.name === action.action)!;
+        await cmd.action(prompt);
       }
     }
   }

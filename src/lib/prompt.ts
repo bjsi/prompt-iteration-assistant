@@ -54,9 +54,20 @@ export interface Action<Output> {
   enabled?: () => boolean;
 }
 
+export type PromptInput = ZodObject<any>;
+export type PromptOutput = ZodType<any>;
+
+export interface CLICommand<
+  InputSchema extends PromptInput,
+  OutputSchema extends PromptOutput
+> {
+  name: string;
+  action: (prompt: Prompt<InputSchema, OutputSchema>) => Promise<void>;
+}
+
 export interface CLIOptions<
-  InputSchema extends ZodObject<any>,
-  OutputSchema extends ZodType<any>
+  InputSchema extends PromptInput,
+  OutputSchema extends PromptOutput
 > {
   formatChatMessage?: (message: ChatCompletionMessageParam) => any;
   inputKeyToCLIPrompt?: (key: keyof z.infer<InputSchema>) => string;
@@ -115,6 +126,7 @@ export interface PromptArgs<
    * Partial because the user can fill in the rest of the values in the CLI dialog.
    */
   vars?: Partial<z.infer<InputSchema>>;
+  commands?: CLICommand<InputSchema, OutputSchema>[];
 
   //
   // LLM parameters
@@ -123,9 +135,6 @@ export interface PromptArgs<
   temperature?: number;
   max_tokens?: number;
 }
-
-export type PromptInput = ZodObject<any>;
-export type PromptOutput = ZodType<any>;
 
 export class Prompt<
   InputSchema extends PromptInput,
@@ -150,6 +159,7 @@ export class Prompt<
 
   temperature?: number;
   max_tokens?: number;
+  commands?: CLICommand<InputSchema, OutputSchema>[] | undefined;
 
   vars: Partial<z.infer<InputSchema>> = {};
 
@@ -171,6 +181,7 @@ export class Prompt<
     this.vars = args.vars || {};
     this.dontSuggestExampleData = args.dontSuggestExampleData;
     this.promptController = args.promptController;
+    this.commands = args.commands;
   }
 
   private createTest = <Input extends Record<string, any>>(args: {
@@ -260,6 +271,21 @@ export class Prompt<
     return this;
   };
 
+  /**
+   * Add a command which displays in the CLI dialog.
+   * Useful for adding commands to quickly test a prompt.
+   */
+  withCommand = (cmd: CLICommand<InputSchema, OutputSchema>) => {
+    if (!this.commands) this.commands = [];
+    this.commands?.push(cmd);
+    return this;
+  };
+
+  /**
+   * Add a prompt test.
+   * Takes low level prompt variables as input and uses the default `prompt.run` method to execute the prompt.
+   * If you want to use a custom run function, use `withCustomTest` instead.
+   */
   withTest = (
     name: string,
     vars: z.infer<InputSchema>,
