@@ -1,3 +1,8 @@
+## 0.0.14
+
+- Export more CLI dialog helpers.
+- Support adding custom CLI dialog commands for each prompt using the `prompt.withCommand()` function.
+
 ## 0.0.13
 
 - Remove required `state` field from the `Prompt` class.
