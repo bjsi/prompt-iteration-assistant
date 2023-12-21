@@ -1,7 +1,7 @@
 import { z } from "zod";
-import { Prompt } from "../lib/prompt";
-import { ChatMessage } from "../openai/messages";
-import { CandidatePrompt } from "../lib/candidatePrompt";
+import { Prompt } from "../../lib/prompt";
+import { ChatMessage } from "../../openai/messages";
+import { CandidatePrompt } from "../../lib/candidatePrompt";
 
 const input = z.object({
   prompt: z.string(),

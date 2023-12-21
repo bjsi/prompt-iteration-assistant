@@ -1,9 +1,9 @@
 import { z } from "zod";
-import { Prompt } from "../lib/prompt";
-import { ChatMessage } from "../openai/messages";
-import { getInputFromEditor } from "../dialogs/actions";
-import { CandidatePrompt } from "../lib/candidatePrompt";
-import { highlightTS } from "../helpers/print";
+import { Prompt } from "../../lib/prompt";
+import { ChatMessage } from "../../openai/messages";
+import { getInputFromEditor } from "../../dialogs/actions";
+import { CandidatePrompt } from "../../lib/candidatePrompt";
+import { highlightTS } from "../../helpers/print";
 
 export interface CreateSchemaState {
   schema?: string;

@@ -1,13 +1,12 @@
-import { z } from "zod";
-import { Action, ExampleDataSet, Prompt } from "../lib/prompt";
+import { Action, ExampleDataSet, Prompt } from "../../lib/prompt";
 import {
   ChatMessage,
   chatMessagesToInstructPrompt,
   instructPromptToChatMessages,
-} from "../openai/messages";
+} from "../../openai/messages";
 import inquirer from "inquirer";
 import * as _ from "remeda";
-import { getUserInput, getInputFromEditor } from "../dialogs/actions";
+import { getUserInput, getInputFromEditor } from "../../dialogs/actions";
 import { ChatCompletionMessageParam } from "openai/resources";
 import {
   highlightJSON,
@@ -16,26 +15,30 @@ import {
   printMarkdownInBox,
   printPrompt,
   printZodSchema,
-} from "../helpers/print";
+} from "../../helpers/print";
 import {
   generateConcurrently,
   generateTextConcurrently,
-} from "../openai/runConcurrent";
-import { CreateSchemaState, createOutputSchema } from "./createOutputSchema";
-import { toCamelCase } from "../helpers/string";
+} from "../../openai/runConcurrent";
+import {
+  CreateSchemaState,
+  createOutputSchema,
+} from "../createOutputSchema/createOutputSchema";
+import { toCamelCase } from "../../helpers/string";
 import { sleep } from "openai/core";
 import { writeFileSync } from "fs";
-import { createInputSchema } from "./createInputSchema";
-import { CandidatePrompt } from "../lib/candidatePrompt";
-import { createZodSchema } from "../helpers/zod";
+import { createInputSchema } from "../createInputSchema/createInputSchema";
+import { CandidatePrompt } from "../../lib/candidatePrompt";
+import { createZodSchema } from "../../helpers/zod";
 import chalk from "chalk";
-import { substituteChatPromptVars } from "../lib/substitutePromptVars";
-import { variablesMissingValues } from "../lib/getValuesForSchema";
-import { PromptController } from "../lib/promptController";
-
-const input = z.object({
-  goal: z.string(),
-});
+import { substituteChatPromptVars } from "../../lib/substitutePromptVars";
+import { variablesMissingValues } from "../../lib/getValuesForSchema";
+import { PromptController } from "../../lib/promptController";
+import {
+  BuildPromptInput,
+  buildPromptInputSchema,
+} from "./schemas/buildPromptInputSchema";
+import { simplePrompt } from "./prompts/simple";
 
 interface BuildPromptState {
   feedback?: ChatCompletionMessageParam[];
@@ -53,7 +56,7 @@ export const DEFAULT_PROMPT_DESCRIPTION = "Prompt Description";
 export const buildPrompt = (args?: {
   promptController?: PromptController<any>;
   state?: Partial<BuildPromptState>;
-  vars?: Partial<z.infer<typeof input>>;
+  vars?: Partial<BuildPromptInput>;
 }) => {
   const state: BuildPromptState = { ...args?.state };
   return new Prompt({
@@ -61,7 +64,7 @@ export const buildPrompt = (args?: {
     vars: args?.vars || {},
     name: CREATE_NEW_PROMPT,
     description: "Create a ChatGPT prompt to solve the user's task",
-    input,
+    input: buildPromptInputSchema,
     model: "gpt-4",
     cliOptions: {
       getNextActions: async (prompt) => {
@@ -514,30 +517,7 @@ if (require.main === module) {
         }
       },
     },
-    prompts: [
-      new CandidatePrompt<z.infer<typeof input>>({
-        name: "sr-prompt-engineer",
-        compile: function () {
-          return [
-            ChatMessage.system(
-              `
-- You are a ChatGPT prompt engineer helping a user create a ChatGPT system instructions prompt.
-- Your role is to write a ChatGPT system instructions prompt to achieve the user's goal.
-- Aim for extreme brevity and clarity.
-- Don't include examples.
-- If the prompt requires input variables, use the following format: \${variableName}.
-- Format the instructions using a markdown unordered list.
-`.trim()
-            ),
-            ChatMessage.user(
-              `
-# The goal of the prompt
-`.trim()
-            ),
-          ];
-        },
-      }),
-    ],
+    prompts: [simplePrompt],
     exampleData: [
       {
         goal: {
