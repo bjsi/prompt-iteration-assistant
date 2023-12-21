@@ -259,13 +259,18 @@ export class Prompt<
   >(
     name: string,
     fn: (this: typeof this, args: Input) => Promise<Output>,
-    vars: Input
+    vars: Input,
+    ...assertions: ((output: Output) => {
+      pass: boolean;
+      score: number;
+      reason: string;
+    })[]
   ) => {
     const test = this.createTest({
       name,
       vars,
       customRunFunction: fn.bind(this),
-      assertions: [],
+      assertions,
     });
     this.tests.push(test);
     return this;

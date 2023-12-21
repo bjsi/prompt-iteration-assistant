@@ -9,3 +9,4 @@ export {
   confirm,
   searchList,
 } from "./dialogs/actions";
+export { toCamelCase } from "./helpers/string";

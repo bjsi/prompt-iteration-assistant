@@ -1,3 +1,8 @@
+## 0.0.15
+
+- Export `toCamelCase` string utility function.
+- Add assertions rest parameter to `withCustomTest` function.
+
 ## 0.0.14
 
 - Export more CLI dialog helpers.
