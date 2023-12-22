@@ -378,8 +378,11 @@ export const buildPrompt = (args?: {
               const feedback = await getUserInput({
                 message: "Feedback for the prompt engineer:",
               });
+              const p = prompt.prompts[0].compile();
               const messages: ChatCompletionMessageParam[] = [
-                ...prompt.prompts[0].compile(),
+                ...(typeof p === "string"
+                  ? instructPromptToChatMessages(p).messages
+                  : p),
                 ChatMessage.assistant(
                   chatMessagesToInstructPrompt({
                     messages: state.currentPrompt.prompts[0].raw().compile(),
