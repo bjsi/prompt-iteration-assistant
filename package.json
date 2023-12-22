@@ -1,6 +1,6 @@
 {
   "name": "prompt-iteration-assistant",
-  "version": "0.0.15",
+  "version": "0.0.16",
   "description": "A set of CLI tools to help you iterate on your LLM prompts.",
   "main": "./dist/index.js",
   "types": "dist/index.d.ts",
@@ -14,7 +14,9 @@
   "scripts": {
     "main": "npx tsx src/main.ts",
     "build": "bash scripts/build.sh",
-    "example:simple": "npx tsx src/examples/simple.ts"
+    "test": "npx jest",
+    "example:simple": "npx tsx src/examples/simple.ts",
+    "example:instruct": "npx tsx src/examples/instructModel.ts"
   },
   "author": "Jamesb",
   "license": "ISC",
@@ -40,8 +42,11 @@
   },
   "devDependencies": {
     "@types/inquirer": "^9.0.7",
+    "@types/jest": "^29.5.11",
     "@types/marked-terminal": "^6.0.1",
     "@types/node": "^20.10.4",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.1.1",
     "ts-node": "^10.9.2",
     "typescript": "^5.3.3"
   }

@@ -41,11 +41,11 @@ export const ChatMessage = {
       content,
     };
   },
-  assistant(
+  assistant<T extends {}>(
     content: string | null,
     function_call?: {
       name: string;
-      arguments: Record<string, any>;
+      arguments: T;
     }
   ): ChatMessage {
     return {
@@ -67,26 +67,28 @@ const promptFrontMatterSchema = z.object({
 });
 
 export const chatMessagesToInstructPrompt = (args: {
-  messages: ChatCompletionMessageParam[];
+  messages: ChatCompletionMessageParam[] | string;
   attributes?: z.infer<typeof promptFrontMatterSchema>;
+  includeRoles?: boolean;
 }) => {
-  const { messages, attributes } = args;
-  const body = messages
-    .map((m) => {
-      if (m.role === "system") {
-        return `# System\n${m.content}`;
-      } else if (m.role === "user") {
-        return `# User\n${m.content}`;
-      } else if (m.role === "assistant") {
-        return `# Assistant\n${m.content}\n${JSON.stringify(
-          m.function_call,
-          null,
-          2
-        )}`;
-      }
-    })
-    .join("\n\n");
-
+  const { messages, attributes, includeRoles } = args;
+  const body =
+    typeof messages === "string"
+      ? messages
+      : messages
+          .map((m) => {
+            if (m.role === "system") {
+              return includeRoles ? `# System\n${m.content}` : m.content;
+            } else if (m.role === "user") {
+              return includeRoles ? `# User\n${m.content}` : m.content;
+            } else if (m.role === "assistant") {
+              const functionCall = JSON.stringify(m.function_call, null, 2);
+              return includeRoles
+                ? `# Assistant\n${m.content}\n${functionCall}`
+                : `${m.content}\n${functionCall}`;
+            }
+          })
+          .join("\n\n");
   const frontMatter = attributes
     ? `---\n${Object.entries(attributes)
         .map(([key, value]) => {
@@ -111,7 +113,8 @@ export const instructPromptToChatMessages = (
 
   const lines = body.split("\n");
   const messages = [];
-  let currentRole: ChatMessage["role"] | null = null;
+  // default to system
+  let currentRole: ChatMessage["role"] | null = "system";
   let content: string[] = [];
 
   lines.forEach((line) => {

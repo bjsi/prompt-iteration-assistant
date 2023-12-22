@@ -5,7 +5,7 @@ import { toCamelCase, truncate } from "../helpers/string";
 import { ExampleDataSet } from "./prompt";
 import inquirer from "inquirer";
 import { getInputFromEditor } from "../dialogs/actions";
-import { brainstormInputs } from "../prompts/brainstormInputs";
+import { brainstormInputs } from "../prompts/brainstormInputs/brainstormInputs";
 import { sleep } from "openai/core";
 
 export function variablesMissingValues<Schema extends z.ZodObject<any>>(args: {

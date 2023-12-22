@@ -1,3 +1,10 @@
+## 0.0.16
+
+- Support OpenAI instruct call stop sequences.
+- Export `ExampleDataset` type.
+- Support basic string prompts.
+- Better instruct model support.
+
 ## 0.0.15
 
 - Export `toCamelCase` string utility function.

@@ -43,8 +43,10 @@ export class CandidatePrompt<Variables extends {}> {
    *
    * NOTE: can't be an arrow function because you need to access `this` to get the variables.
    */
-  compile: (this: CandidatePrompt<Variables>) => ChatCompletionMessageParam[];
-  private unboundCompile: () => ChatCompletionMessageParam[];
+  compile: (
+    this: CandidatePrompt<Variables>
+  ) => ChatCompletionMessageParam[] | string;
+  private unboundCompile: () => ChatCompletionMessageParam[] | string;
 
   /**
    * The variables to be used in the prompt. Use `this.getVariable()` to access them.
@@ -53,7 +55,9 @@ export class CandidatePrompt<Variables extends {}> {
 
   constructor(args: {
     name: string;
-    compile: (this: CandidatePrompt<Variables>) => ChatCompletionMessageParam[];
+    compile: (
+      this: CandidatePrompt<Variables>
+    ) => ChatCompletionMessageParam[] | string;
     raw?: boolean;
   }) {
     this.name = args.name;
@@ -84,7 +88,9 @@ export class CandidatePrompt<Variables extends {}> {
    */
   getAllVariablePlaceholders() {
     const messages = this.raw().compile();
-    const asString = chatMessagesToInstructPrompt({ messages });
+    const asString = Array.isArray(messages)
+      ? chatMessagesToInstructPrompt({ messages })
+      : messages;
     const vars = getPromptVars(asString);
     return vars;
   }

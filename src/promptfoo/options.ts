@@ -2,8 +2,10 @@ import { ChatCompletionMessageParam } from "openai/resources";
 import { OPENAI_CHAT_MODEL, OPENAI_INSTRUCT_MODEL } from "../openai/models";
 
 export const plainTextTestOptions = (opts: {
-  prompts: ChatCompletionMessageParam[][];
+  prompts: (ChatCompletionMessageParam[] | string)[];
   model: OPENAI_CHAT_MODEL | OPENAI_INSTRUCT_MODEL;
+  stopSequences?: string[];
+  temperature?: number;
 }) => {
   return {
     prompts: opts.prompts.map((p) => JSON.stringify(p)),
@@ -16,9 +18,11 @@ export const plainTextTestOptions = (opts: {
 };
 
 export const functionCallTestOptions = (opts: {
-  prompts: ChatCompletionMessageParam[][];
+  prompts: (ChatCompletionMessageParam[] | string)[];
   functions?: any[];
   model: OPENAI_CHAT_MODEL | OPENAI_INSTRUCT_MODEL;
+  stopSequences?: string[];
+  temperature?: number;
 }) => {
   return {
     prompts: opts.prompts.map((p) => JSON.stringify(p)),
@@ -27,6 +31,8 @@ export const functionCallTestOptions = (opts: {
         id: `openai:${opts.model}`,
         config: {
           functions: opts.functions,
+          stopSequences: opts.stopSequences,
+          temperature: opts.temperature,
         },
       },
     ],
@@ -39,7 +45,7 @@ export const functionCallTestOptions = (opts: {
 };
 
 export const customTestOptions = <Input extends Record<string, any>>(opts: {
-  prompts: ChatCompletionMessageParam[][];
+  prompts: (ChatCompletionMessageParam[] | string)[];
   callApi: (input: Input) => Promise<string | object | undefined>;
 }) => {
   return {

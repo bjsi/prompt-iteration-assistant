@@ -45,12 +45,16 @@ export const printZodSchema = async (args: {
 };
 
 interface PrintChatMessagesArgs {
-  messages: ChatCompletionMessageParam[];
+  messages: ChatCompletionMessageParam[] | string;
   hideSystem?: boolean;
 }
 
 export const printChatMessages = (args: PrintChatMessagesArgs) => {
   const { messages, hideSystem } = args;
+  if (typeof messages === "string") {
+    console.log(markdownInBox(messages));
+    return;
+  }
   console.log(
     messages
       .filter((message) => (hideSystem ? message.role !== "system" : true))

@@ -31,7 +31,7 @@ import { toCamelCase } from "../helpers/string";
 import chalk from "chalk";
 import { CandidatePrompt } from "./candidatePrompt";
 import { getValuesForSchema as askUserForValuesForSchema } from "./getValuesForSchema";
-import { CREATE_NEW_TEST } from "../prompts/createNewTest";
+import { CREATE_NEW_TEST } from "../prompts/createNewTest/createNewTest";
 import { sleep } from "openai/core";
 import { getInputFromCLI, searchList } from "../dialogs/actions";
 import { PromptController } from "./promptController";
@@ -134,6 +134,7 @@ export interface PromptArgs<
   model: OPENAI_CHAT_MODEL | OPENAI_INSTRUCT_MODEL;
   temperature?: number;
   max_tokens?: number;
+  stop?: string[];
 }
 
 export class Prompt<
@@ -152,6 +153,7 @@ export class Prompt<
   exampleData: ExampleDataSet<InputSchema>[];
   dontSuggestExampleData?: boolean | undefined;
   model: OPENAI_CHAT_MODEL | OPENAI_INSTRUCT_MODEL;
+  stop?: string[] | undefined;
   input?: InputSchema;
   output?: OutputSchema;
 
@@ -163,7 +165,6 @@ export class Prompt<
 
   vars: Partial<z.infer<InputSchema>> = {};
 
-  private extraMessages: ChatCompletionMessageParam[] = [];
   private tests: promptfoo.EvaluateTestSuite[] = [];
 
   constructor(args: PromptArgs<InputSchema, OutputSchema>) {
@@ -214,12 +215,16 @@ export class Prompt<
             },
           ],
           model: this.model,
+          stopSequences: this.stop,
+          temperature: this.temperature,
         })
       : plainTextTestOptions({
           prompts: this.prompts.map((prompt) =>
             prompt.withVariables(args.vars).compile()
           ),
           model: this.model,
+          stopSequences: this.stop,
+          temperature: this.temperature,
         });
     const defaultAsserts = this.output ? [assertValidSchema(this.output)] : [];
     const test: promptfoo.EvaluateTestSuite = {
@@ -521,11 +526,9 @@ export class Prompt<
     verbose?: boolean;
     abortSignal?: AbortSignal;
   }): Promise<any> {
+    args.verbose = true;
     const promptVars = this.input?.parse(args.promptVariables) || {};
-    const messages = this.prompts[0]
-      .withVariables(promptVars)
-      .compile()
-      .concat(this.extraMessages);
+    const messages = this.prompts[0].withVariables(promptVars).compile();
     if (args.verbose) {
       console.log("model:", this.model);
       if (this.model === "gpt-3.5-turbo-instruct") {
@@ -540,11 +543,13 @@ export class Prompt<
         this.model === "gpt-3.5-turbo-instruct"
           ? openai.CompletionTextGenerator({
               model: "gpt-3.5-turbo-instruct",
+              stopSequences: this.stop,
               temperature: this.temperature,
               maxCompletionTokens: this.max_tokens,
             })
           : openai.ChatTextGenerator({
               model: this.model,
+              stopSequences: this.stop,
               temperature: this.temperature,
               maxCompletionTokens: this.max_tokens,
             });
@@ -571,6 +576,7 @@ export class Prompt<
       const config = openai
         .ChatTextGenerator({
           model: this.model,
+          stopSequences: this.stop,
           temperature: this.temperature,
           maxCompletionTokens: this.max_tokens,
         })

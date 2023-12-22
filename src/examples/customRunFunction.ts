@@ -56,6 +56,7 @@ class BrainstormIdeas extends Prompt<typeof input, typeof output> {
    * My custom run function.
    * It can take different arguments than the default run function.
    * It can perform pre- and post-processing logic.
+   * It can call the underlying `run` function in a loop to process large inputs.
    */
   async runProd(args: {
     input: BrainstormIdeasInput;
@@ -73,7 +74,14 @@ export const brainstormIdeas = () => {
     async function (args: BrainstormIdeasInput) {
       return this.runProd({ input: args });
     },
-    { projectTitle: "My Test Project" }
+    { projectTitle: "My Test Project" },
+    (output) => {
+      return {
+        score: output.ideas.length > 0 ? 1 : 0,
+        reason: "",
+        pass: output.ideas.length > 0,
+      };
+    }
   );
 };
 
