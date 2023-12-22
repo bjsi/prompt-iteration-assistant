@@ -326,7 +326,7 @@ export class Prompt<
       existingVariables: this.vars,
       exampleData: this.dontSuggestExampleData ? [] : this.exampleData,
       prompt: chatMessagesToInstructPrompt({
-        messages: this.prompts[0].raw().compile(),
+        messages: this.chooseCandidatePrompt().raw().compile(),
         attributes: {
           name: this.name,
           description: this.description,
@@ -504,6 +504,10 @@ export class Prompt<
     }
   }
 
+  chooseCandidatePrompt = () => {
+    return this.prompts[0];
+  };
+
   async run(args: {
     promptVariables: z.infer<InputSchema>;
     stream: true;
@@ -528,7 +532,9 @@ export class Prompt<
   }): Promise<any> {
     args.verbose = true;
     const promptVars = this.input?.parse(args.promptVariables) || {};
-    const messages = this.prompts[0].withVariables(promptVars).compile();
+    const messages = this.chooseCandidatePrompt()
+      .withVariables(promptVars)
+      .compile();
     if (args.verbose) {
       console.log("model:", this.model);
       if (this.model === "gpt-3.5-turbo-instruct") {

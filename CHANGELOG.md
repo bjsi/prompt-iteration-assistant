@@ -1,3 +1,7 @@
+## 0.0.17
+
+- Add `prompt.chooseCandidatePrompt` function.
+
 ## 0.0.16
 
 - Support OpenAI instruct call stop sequences.

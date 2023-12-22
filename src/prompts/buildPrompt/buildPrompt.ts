@@ -83,7 +83,9 @@ export const buildPrompt = (args?: {
               name: "Output",
             });
           }
-          printPrompt(curPrompt.prompts[0].raw().compile() as ChatMessage[]);
+          printPrompt(
+            curPrompt.chooseCandidatePrompt().raw().compile() as ChatMessage[]
+          );
         } else {
           printMarkdownInBox(
             `- No prompt generated.\n- Run the ${chalk.green(
@@ -92,13 +94,13 @@ export const buildPrompt = (args?: {
             chalk.green("Prompt")
           );
           printChatMessages({
-            messages: prompt.prompts[0].raw().compile(),
+            messages: prompt.chooseCandidatePrompt().raw().compile(),
             hideSystem: true,
           });
         }
 
         const updateCurrentPrompt = async (newPromptText: string) => {
-          const oldPrompt = state.currentPrompt?.prompts[0];
+          const oldPrompt = state.currentPrompt?.chooseCandidatePrompt();
           if (!state.currentPrompt) {
             state.currentPrompt = new Prompt({
               name: DEFAULT_PROMPT_NAME,
@@ -356,7 +358,10 @@ export const buildPrompt = (args?: {
               const currentPrompt = state.currentPrompt;
               const editor = await getInputFromEditor({
                 input: chatMessagesToInstructPrompt({
-                  messages: currentPrompt.prompts[0].raw().compile(),
+                  messages: currentPrompt
+                    .chooseCandidatePrompt()
+                    .raw()
+                    .compile(),
                   attributes: {
                     name: currentPrompt.name,
                     description: currentPrompt.description,
@@ -378,14 +383,17 @@ export const buildPrompt = (args?: {
               const feedback = await getUserInput({
                 message: "Feedback for the prompt engineer:",
               });
-              const p = prompt.prompts[0].compile();
+              const p = prompt.chooseCandidatePrompt().compile();
               const messages: ChatCompletionMessageParam[] = [
                 ...(typeof p === "string"
                   ? instructPromptToChatMessages(p).messages
                   : p),
                 ChatMessage.assistant(
                   chatMessagesToInstructPrompt({
-                    messages: state.currentPrompt.prompts[0].raw().compile(),
+                    messages: state.currentPrompt
+                      .chooseCandidatePrompt()
+                      .raw()
+                      .compile(),
                   })
                 ),
                 ChatMessage.user(feedback),
