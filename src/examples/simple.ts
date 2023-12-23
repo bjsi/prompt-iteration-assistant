@@ -35,8 +35,11 @@ export const brainstormIdeas = () =>
         },
       }),
     ],
-  }).withTest("test 1", {
-    projectTitle: "ChatGPT",
+  }).withTest({
+    name: "test 1",
+    vars: {
+      projectTitle: "ChatGPT",
+    },
   });
 
 if (require.main === module) {

@@ -1,12 +1,16 @@
 import { ChatCompletionMessageParam } from "openai/resources";
 import { OPENAI_CHAT_MODEL, OPENAI_INSTRUCT_MODEL } from "../openai/models";
 
+export interface ModelParams {
+  stop?: string[];
+  temperature?: number;
+  max_tokens?: number;
+}
+
 export const plainTextTestOptions = (opts: {
   prompts: (ChatCompletionMessageParam[] | string)[];
   model: OPENAI_CHAT_MODEL | OPENAI_INSTRUCT_MODEL;
-  stopSequences?: string[];
-  temperature?: number;
-  maxTokens?: number;
+  modelParams: ModelParams;
 }) => {
   return {
     prompts: opts.prompts.map((p) => JSON.stringify(p)),
@@ -14,9 +18,7 @@ export const plainTextTestOptions = (opts: {
       {
         id: `openai:${opts.model}`,
         config: {
-          stop: opts.stopSequences,
-          temperature: opts.temperature,
-          max_tokens: opts.maxTokens,
+          ...opts.modelParams,
         },
       },
     ],
@@ -25,22 +27,19 @@ export const plainTextTestOptions = (opts: {
 
 export const functionCallTestOptions = (opts: {
   prompts: (ChatCompletionMessageParam[] | string)[];
-  functions?: any[];
+  functions: any[];
   model: OPENAI_CHAT_MODEL | OPENAI_INSTRUCT_MODEL;
-  stopSequences?: string[];
-  temperature?: number;
-  maxTokens?: number;
+  modelParams: ModelParams;
 }) => {
+  console.log("function call test opts");
   return {
     prompts: opts.prompts.map((p) => JSON.stringify(p)),
     providers: [
       {
         id: `openai:${opts.model}`,
         config: {
+          ...opts.modelParams,
           functions: opts.functions,
-          stop: opts.stopSequences,
-          temperature: opts.temperature,
-          max_tokens: opts.maxTokens,
         },
       },
     ],

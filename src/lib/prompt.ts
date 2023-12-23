@@ -9,6 +9,7 @@ import searchlist from "inquirer-search-list";
 import dotenv from "dotenv";
 import { OPENAI_CHAT_MODEL, OPENAI_INSTRUCT_MODEL } from "../openai/models";
 import {
+  ModelParams,
   customTestOptions,
   functionCallTestOptions,
   plainTextTestOptions,
@@ -202,11 +203,10 @@ export class Prompt<
       reason: string;
     })[];
   }) => {
-    const modelParams = {
-      model: this.model,
-      stopSequences: this.stop,
+    const modelParams: ModelParams = {
+      stop: this.stop,
       temperature: this.temperature,
-      maxCompletionTokens: this.max_tokens,
+      max_tokens: this.max_tokens,
     };
     const prompts = args.onlyTestMainPrompt
       ? [this.chooseCandidatePrompt(args.vars).raw().compile()]
@@ -226,12 +226,16 @@ export class Prompt<
               parameters: zodToJsonSchema(this.output),
             },
           ],
-          ...modelParams,
+          model: this.model,
+          modelParams,
         })
       : plainTextTestOptions({
           prompts,
-          ...modelParams,
+          model: this.model,
+          modelParams,
         });
+
+    console.log(JSON.stringify(options, null, 2));
     const defaultAsserts = this.output ? [assertValidSchema(this.output)] : [];
     const test: promptfoo.EvaluateTestSuite = {
       ...options,

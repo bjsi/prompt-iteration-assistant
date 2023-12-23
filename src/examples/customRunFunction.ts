@@ -70,11 +70,13 @@ class BrainstormIdeas extends Prompt<typeof input, typeof output> {
  */
 export const brainstormIdeas = () => {
   return new BrainstormIdeas().withCustomTest(
-    "test",
+    {
+      name: "test",
+      vars: { projectTitle: "My Test Project" },
+    },
     async function (args: BrainstormIdeasInput) {
       return this.runProd({ input: args });
     },
-    { projectTitle: "My Test Project" },
     (output) => {
       return {
         score: output.ideas.length > 0 ? 1 : 0,
