@@ -493,7 +493,7 @@ export class Prompt<
       );
       for (let i = 0; i < results.table.head.prompts.length; i++) {
         const prompt = results.table.head.prompts[i];
-        //prompt.display = `Prompt: ${this.prompts[i].name}`;
+        prompt.display = `Prompt: ${this.prompts[i].name}`;
       }
       console.log(
         generateTable(
