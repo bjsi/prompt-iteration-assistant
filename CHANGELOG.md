@@ -1,3 +1,7 @@
+## 0.0.25
+
+- Fix function calling misbehaving in tests (again).
+
 ## 0.0.23
 
 - Fix function calling misbehaving in tests.
