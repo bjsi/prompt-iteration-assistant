@@ -209,8 +209,12 @@ export class Prompt<
       max_tokens: this.max_tokens,
     };
     const prompts = args.onlyTestMainPrompt
-      ? [this.chooseCandidatePrompt(args.vars).raw().compile()]
-      : this.prompts.map((prompt) => prompt.raw().compile());
+      ? [
+          this.chooseCandidatePrompt(args.vars)
+            .withVariables(args.vars)
+            .compile(),
+        ]
+      : this.prompts.map((prompt) => prompt.withVariables(args.vars).compile());
     const options = args.customRunFunction
       ? customTestOptions({
           prompts,
@@ -241,9 +245,7 @@ export class Prompt<
       description: args.name,
       tests: [
         {
-          vars: {
-            ...args.vars,
-          },
+          vars: args.vars,
           assert: [
             ...defaultAsserts,
             ...(this.output
@@ -480,6 +482,7 @@ export class Prompt<
           env: {
             OPENAI_API_KEY: process.env.OPENAI_API_KEY,
           },
+          writeLatestResults: true,
         },
         {
           maxConcurrency: 2,
@@ -490,7 +493,7 @@ export class Prompt<
       );
       for (let i = 0; i < results.table.head.prompts.length; i++) {
         const prompt = results.table.head.prompts[i];
-        prompt.display = `Prompt: ${this.prompts[i].name}`;
+        //prompt.display = `Prompt: ${this.prompts[i].name}`;
       }
       console.log(
         generateTable(
