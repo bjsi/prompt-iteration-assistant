@@ -1,3 +1,7 @@
+## 0.0.21
+
+- Fix model params not assigned properly (again).
+
 ## 0.0.20
 
 - Fix model params not assigned properly.

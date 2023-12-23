@@ -221,6 +221,7 @@ export class Prompt<
           model: this.model,
           stopSequences: this.stop,
           temperature: this.temperature,
+          maxTokens: this.max_tokens,
         })
       : plainTextTestOptions({
           prompts: this.prompts.map((prompt) =>
@@ -229,6 +230,7 @@ export class Prompt<
           model: this.model,
           stopSequences: this.stop,
           temperature: this.temperature,
+          maxTokens: this.max_tokens,
         });
     const defaultAsserts = this.output ? [assertValidSchema(this.output)] : [];
     const test: promptfoo.EvaluateTestSuite = {
