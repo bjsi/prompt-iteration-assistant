@@ -183,6 +183,10 @@ export class Prompt<
     this.dontSuggestExampleData = args.dontSuggestExampleData;
     this.promptController = args.promptController;
     this.commands = args.commands;
+
+    this.temperature = args.temperature;
+    this.max_tokens = args.max_tokens;
+    this.stop = args.stop;
   }
 
   private createTest = <Input extends Record<string, any>>(args: {

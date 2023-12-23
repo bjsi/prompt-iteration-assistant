@@ -1,3 +1,7 @@
+## 0.0.20
+
+- Fix model params not assigned properly.
+
 ## 0.0.19
 
 - Fix options not passed to tests.
