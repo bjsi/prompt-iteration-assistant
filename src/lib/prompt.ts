@@ -235,7 +235,6 @@ export class Prompt<
           modelParams,
         });
 
-    console.log(JSON.stringify(options, null, 2));
     const defaultAsserts = this.output ? [assertValidSchema(this.output)] : [];
     const test: promptfoo.EvaluateTestSuite = {
       ...options,

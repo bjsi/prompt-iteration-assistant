@@ -23,14 +23,16 @@ export const brainstormIdeas = () =>
     input,
     output,
     model: "gpt-4",
-    max_tokens: 100,
+    max_tokens: 250,
     prompts: [
       new CandidatePrompt<BrainstormIdeasInput>({
         name: "basic",
         compile: function () {
           return [
             ChatMessage.system(`- Brainstorm ideas for a new project.
-- The project should be called ${this.getVariable("projectTitle")}.`),
+- The project should be called ${this.getVariable("projectTitle")}.
+- The ideas should be one setence each.
+- Create 3 ideas.`),
           ];
         },
       }),

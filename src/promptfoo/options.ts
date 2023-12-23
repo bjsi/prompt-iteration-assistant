@@ -31,7 +31,6 @@ export const functionCallTestOptions = (opts: {
   model: OPENAI_CHAT_MODEL | OPENAI_INSTRUCT_MODEL;
   modelParams: ModelParams;
 }) => {
-  console.log("function call test opts");
   return {
     prompts: opts.prompts.map((p) => JSON.stringify(p)),
     providers: [
@@ -39,6 +38,10 @@ export const functionCallTestOptions = (opts: {
         id: `openai:${opts.model}`,
         config: {
           ...opts.modelParams,
+          function_call:
+            opts.functions?.length === 1
+              ? { name: opts.functions[0].name }
+              : undefined,
           functions: opts.functions,
         },
       },
