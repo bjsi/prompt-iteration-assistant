@@ -1,3 +1,7 @@
+## 0.0.23
+
+- Fix function calling misbehaving in tests.
+
 ## 0.0.22
 
 - Add `onlyTestMainPrompt` option to test methods.
