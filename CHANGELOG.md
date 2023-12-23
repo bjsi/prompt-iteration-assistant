@@ -1,3 +1,7 @@
+## 0.0.22
+
+- Add `onlyTestMainPrompt` option to test methods.
+
 ## 0.0.21
 
 - Fix model params not assigned properly (again).

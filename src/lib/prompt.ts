@@ -192,6 +192,7 @@ export class Prompt<
   private createTest = <Input extends Record<string, any>>(args: {
     name: string;
     vars: Input;
+    onlyTestMainPrompt?: boolean;
     customRunFunction?: (vars: Input) => Promise<string | object | undefined>;
     assertions: ((
       output: OutputSchema extends ZodType<infer U> ? U : string | null
@@ -201,16 +202,23 @@ export class Prompt<
       reason: string;
     })[];
   }) => {
+    const modelParams = {
+      model: this.model,
+      stopSequences: this.stop,
+      temperature: this.temperature,
+      maxCompletionTokens: this.max_tokens,
+    };
+    const prompts = args.onlyTestMainPrompt
+      ? [this.chooseCandidatePrompt(args.vars).raw().compile()]
+      : this.prompts.map((prompt) => prompt.raw().compile());
     const options = args.customRunFunction
       ? customTestOptions({
-          prompts: this.prompts.map((prompt) => prompt.raw().compile()),
+          prompts,
           callApi: args.customRunFunction,
         })
       : this.output
       ? functionCallTestOptions({
-          prompts: this.prompts.map((prompt) =>
-            prompt.withVariables(args.vars).compile()
-          ),
+          prompts,
           functions: [
             {
               name: toCamelCase(this.name),
@@ -218,19 +226,11 @@ export class Prompt<
               parameters: zodToJsonSchema(this.output),
             },
           ],
-          model: this.model,
-          stopSequences: this.stop,
-          temperature: this.temperature,
-          maxTokens: this.max_tokens,
+          ...modelParams,
         })
       : plainTextTestOptions({
-          prompts: this.prompts.map((prompt) =>
-            prompt.withVariables(args.vars).compile()
-          ),
-          model: this.model,
-          stopSequences: this.stop,
-          temperature: this.temperature,
-          maxTokens: this.max_tokens,
+          prompts,
+          ...modelParams,
         });
     const defaultAsserts = this.output ? [assertValidSchema(this.output)] : [];
     const test: promptfoo.EvaluateTestSuite = {
@@ -268,9 +268,12 @@ export class Prompt<
     Input extends Record<string, string | object>,
     Output extends string | object | undefined
   >(
-    name: string,
+    opts: {
+      name: string;
+      vars: Input;
+      onlyTestMainPrompt?: boolean;
+    },
     fn: (this: typeof this, args: Input) => Promise<Output>,
-    vars: Input,
     ...assertions: ((output: Output) => {
       pass: boolean;
       score: number;
@@ -278,8 +281,7 @@ export class Prompt<
     })[]
   ) => {
     const test = this.createTest({
-      name,
-      vars,
+      ...opts,
       customRunFunction: fn.bind(this),
       assertions,
     });
@@ -303,8 +305,11 @@ export class Prompt<
    * If you want to use a custom run function, use `withCustomTest` instead.
    */
   withTest = (
-    name: string,
-    vars: z.infer<InputSchema>,
+    opts: {
+      name: string;
+      vars: z.infer<InputSchema>;
+      onlyTestMainPrompt?: boolean;
+    },
     ...assertions: ((
       output: OutputSchema extends ZodType<infer U> ? U : string | null
     ) => {
@@ -314,8 +319,7 @@ export class Prompt<
     })[]
   ) => {
     const test = this.createTest({
-      name,
-      vars,
+      ...opts,
       assertions,
     });
     this.tests.push(test);
