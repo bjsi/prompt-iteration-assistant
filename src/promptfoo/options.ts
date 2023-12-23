@@ -6,12 +6,18 @@ export const plainTextTestOptions = (opts: {
   model: OPENAI_CHAT_MODEL | OPENAI_INSTRUCT_MODEL;
   stopSequences?: string[];
   temperature?: number;
+  maxTokens?: number;
 }) => {
   return {
     prompts: opts.prompts.map((p) => JSON.stringify(p)),
     providers: [
       {
         id: `openai:${opts.model}`,
+        config: {
+          stop: opts.stopSequences,
+          temperature: opts.temperature,
+          max_tokens: opts.maxTokens,
+        },
       },
     ],
   };
@@ -23,6 +29,7 @@ export const functionCallTestOptions = (opts: {
   model: OPENAI_CHAT_MODEL | OPENAI_INSTRUCT_MODEL;
   stopSequences?: string[];
   temperature?: number;
+  maxTokens?: number;
 }) => {
   return {
     prompts: opts.prompts.map((p) => JSON.stringify(p)),
@@ -31,8 +38,9 @@ export const functionCallTestOptions = (opts: {
         id: `openai:${opts.model}`,
         config: {
           functions: opts.functions,
-          stopSequences: opts.stopSequences,
+          stop: opts.stopSequences,
           temperature: opts.temperature,
+          max_tokens: opts.maxTokens,
         },
       },
     ],

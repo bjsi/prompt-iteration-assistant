@@ -1,3 +1,7 @@
+## 0.0.19
+
+- Fix options not passed to tests.
+
 ## 0.0.18
 
 - Add params to `prompt.chooseCandidatePrompt` function.
