@@ -84,7 +84,10 @@ export const buildPrompt = (args?: {
             });
           }
           printPrompt(
-            curPrompt.chooseCandidatePrompt().raw().compile() as ChatMessage[]
+            curPrompt
+              .chooseCandidatePrompt(curPrompt.vars)
+              .raw()
+              .compile() as ChatMessage[]
           );
         } else {
           printMarkdownInBox(
@@ -94,13 +97,15 @@ export const buildPrompt = (args?: {
             chalk.green("Prompt")
           );
           printChatMessages({
-            messages: prompt.chooseCandidatePrompt().raw().compile(),
+            messages: prompt.chooseCandidatePrompt(prompt.vars).raw().compile(),
             hideSystem: true,
           });
         }
 
         const updateCurrentPrompt = async (newPromptText: string) => {
-          const oldPrompt = state.currentPrompt?.chooseCandidatePrompt();
+          const oldPrompt = state.currentPrompt?.chooseCandidatePrompt(
+            state.currentPrompt.vars
+          );
           if (!state.currentPrompt) {
             state.currentPrompt = new Prompt({
               name: DEFAULT_PROMPT_NAME,
@@ -359,7 +364,7 @@ export const buildPrompt = (args?: {
               const editor = await getInputFromEditor({
                 input: chatMessagesToInstructPrompt({
                   messages: currentPrompt
-                    .chooseCandidatePrompt()
+                    .chooseCandidatePrompt(currentPrompt.vars)
                     .raw()
                     .compile(),
                   attributes: {
@@ -383,7 +388,7 @@ export const buildPrompt = (args?: {
               const feedback = await getUserInput({
                 message: "Feedback for the prompt engineer:",
               });
-              const p = prompt.chooseCandidatePrompt().compile();
+              const p = prompt.chooseCandidatePrompt(prompt.vars).compile();
               const messages: ChatCompletionMessageParam[] = [
                 ...(typeof p === "string"
                   ? instructPromptToChatMessages(p).messages
@@ -391,7 +396,7 @@ export const buildPrompt = (args?: {
                 ChatMessage.assistant(
                   chatMessagesToInstructPrompt({
                     messages: state.currentPrompt
-                      .chooseCandidatePrompt()
+                      .chooseCandidatePrompt(state.currentPrompt.vars)
                       .raw()
                       .compile(),
                   })

@@ -1,3 +1,7 @@
+## 0.0.18
+
+- Add params to `prompt.chooseCandidatePrompt` function.
+
 ## 0.0.17
 
 - Add `prompt.chooseCandidatePrompt` function.

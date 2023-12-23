@@ -326,7 +326,7 @@ export class Prompt<
       existingVariables: this.vars,
       exampleData: this.dontSuggestExampleData ? [] : this.exampleData,
       prompt: chatMessagesToInstructPrompt({
-        messages: this.chooseCandidatePrompt().raw().compile(),
+        messages: this.chooseCandidatePrompt(this.vars).raw().compile(),
         attributes: {
           name: this.name,
           description: this.description,
@@ -504,10 +504,13 @@ export class Prompt<
     }
   }
 
-  chooseCandidatePrompt = () => {
+  chooseCandidatePrompt = (vars: Partial<z.infer<InputSchema>>) => {
     return this.prompts[0];
   };
 
+  /**
+   * Basic prompt run function. Supports generating or streaming both text and structured data.
+   */
   async run(args: {
     promptVariables: z.infer<InputSchema>;
     stream: true;
@@ -532,7 +535,7 @@ export class Prompt<
   }): Promise<any> {
     args.verbose = true;
     const promptVars = this.input?.parse(args.promptVariables) || {};
-    const messages = this.chooseCandidatePrompt()
+    const messages = this.chooseCandidatePrompt(promptVars)
       .withVariables(promptVars)
       .compile();
     if (args.verbose) {
