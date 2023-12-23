@@ -548,8 +548,11 @@ if (require.main === module) {
 if (require.main === module) {
   const bp = buildPrompt();
 
-  bp.withTest("flashcard assistant", {
-    goal: bp.exampleData[0].goal.value,
+  bp.withTest({
+    name: "flashcard assistant",
+    vars: {
+      goal: bp.exampleData[0].goal.value,
+    },
   });
 
   bp.cli("test");
