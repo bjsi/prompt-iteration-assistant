@@ -205,14 +205,17 @@ export class Prompt<
   /**
    * Calculate the cost of running the prompt, excluding output.
    * To calculate total cost for an actual model call, see the `run` method.
+   * WARNING: this method is experimental and may not be perfectly accurate.
    */
   async calculateCost(promptVariables: z.infer<InputSchema>) {
     const messages = this.chooseCandidatePrompt(promptVariables)
       .withVariables(promptVariables)
       .compile();
-    console.log(messages);
     const outputSchema = this.output
-      ? JSON.stringify(zodToJsonSchema(this.output))
+      ? JSON.stringify({
+          name: toCamelCase(this.name),
+          arguments: zodToJsonSchema(this.output),
+        })
       : "";
     const tokenizer = openai.Tokenizer({ model: this.model });
     const promptTokens =
