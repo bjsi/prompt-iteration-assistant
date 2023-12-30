@@ -1,3 +1,8 @@
+## 0.0.26
+
+- Add prompt `calculateCost` method to calculate the cost of input tokens.
+- Add support for passing ModelFusion `Run` objects to the `prompt.run` method.
+
 ## 0.0.25
 
 - Fix function calling misbehaving in tests (again).

@@ -2,7 +2,7 @@
  * Available OpenAI chat models.
  * @see https://platform.openai.com/docs/models/
  */
-export const OPENAI_CHAT_MODELS = [
+export const OPENAI_CHAT_MODEL_NAME = [
   "gpt-4",
   "gpt-4-0314",
   "gpt-4-0613",
@@ -19,8 +19,9 @@ export const OPENAI_CHAT_MODELS = [
   "gpt-3.5-turbo-16k-0613",
 ] as const;
 
-export type OPENAI_CHAT_MODEL = (typeof OPENAI_CHAT_MODELS)[number];
+export type OPENAI_CHAT_MODEL_NAME = (typeof OPENAI_CHAT_MODEL_NAME)[number];
 
-export const OPENAI_INSTRUCT_MODELS = ["gpt-3.5-turbo-instruct"] as const;
+export const OPENAI_INSTRUCT_MODEL_NAME = ["gpt-3.5-turbo-instruct"] as const;
 
-export type OPENAI_INSTRUCT_MODEL = (typeof OPENAI_INSTRUCT_MODELS)[number];
+export type OPENAI_INSTRUCT_MODEL_NAME =
+  (typeof OPENAI_INSTRUCT_MODEL_NAME)[number];

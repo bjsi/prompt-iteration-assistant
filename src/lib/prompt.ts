@@ -1,13 +1,19 @@
 import * as promptfoo from "promptfoo";
 import { ZodObject, ZodType, z } from "zod";
-import { ChatCompletionMessageParam } from "openai/resources";
+import {
+  ChatCompletionMessage,
+  ChatCompletionMessageParam,
+} from "openai/resources";
 import zodToJsonSchema from "zod-to-json-schema";
 import { Command } from "commander";
 import inquirer from "inquirer";
 // @ts-ignore
 import searchlist from "inquirer-search-list";
 import dotenv from "dotenv";
-import { OPENAI_CHAT_MODEL, OPENAI_INSTRUCT_MODEL } from "../openai/models";
+import {
+  OPENAI_CHAT_MODEL_NAME,
+  OPENAI_INSTRUCT_MODEL_NAME,
+} from "../openai/models";
 import {
   ModelParams,
   customTestOptions,
@@ -15,12 +21,17 @@ import {
   plainTextTestOptions,
 } from "../promptfoo/options";
 import { assertJSON, assertValidSchema } from "../promptfoo/assertions";
-import { chatMessagesToInstructPrompt } from "../openai/messages";
+import { ChatMessage, chatMessagesToInstructPrompt } from "../openai/messages";
 import {
+  OPENAI_CHAT_MODELS,
+  OPENAI_TEXT_GENERATION_MODELS,
   OpenAIChatMessage,
   OpenAICompletionModel,
+  Run,
   StructureStreamPart,
   ZodSchema,
+  countOpenAIChatPromptTokens,
+  countTokens,
   generateStructure,
   generateText,
   openai,
@@ -38,6 +49,7 @@ import { getInputFromCLI, searchList } from "../dialogs/actions";
 import { PromptController } from "./promptController";
 import { confirm } from "../dialogs/actions";
 import { generateTable } from "../promptfoo/generateTable";
+import { Cost } from "modelfusion-experimental";
 
 dotenv.config();
 inquirer.registerPrompt("search-list", searchlist);
@@ -132,7 +144,7 @@ export interface PromptArgs<
   //
   // LLM parameters
 
-  model: OPENAI_CHAT_MODEL | OPENAI_INSTRUCT_MODEL;
+  model: OPENAI_CHAT_MODEL_NAME | OPENAI_INSTRUCT_MODEL_NAME;
   temperature?: number;
   max_tokens?: number;
   stop?: string[];
@@ -153,7 +165,7 @@ export class Prompt<
    */
   exampleData: ExampleDataSet<InputSchema>[];
   dontSuggestExampleData?: boolean | undefined;
-  model: OPENAI_CHAT_MODEL | OPENAI_INSTRUCT_MODEL;
+  model: OPENAI_CHAT_MODEL_NAME | OPENAI_INSTRUCT_MODEL_NAME;
   stop?: string[] | undefined;
   input?: InputSchema;
   output?: OutputSchema;
@@ -188,6 +200,45 @@ export class Prompt<
     this.temperature = args.temperature;
     this.max_tokens = args.max_tokens;
     this.stop = args.stop;
+  }
+
+  /**
+   * Calculate the cost of running the prompt, excluding output.
+   * To calculate total cost for an actual model call, see the `run` method.
+   */
+  async calculateCost(promptVariables: z.infer<InputSchema>) {
+    const messages = this.chooseCandidatePrompt(promptVariables)
+      .withVariables(promptVariables)
+      .compile();
+    console.log(messages);
+    const outputSchema = this.output
+      ? JSON.stringify(zodToJsonSchema(this.output))
+      : "";
+    const tokenizer = openai.Tokenizer({ model: this.model });
+    const promptTokens =
+      typeof messages === "string"
+        ? await countTokens(tokenizer, messages)
+        : await countOpenAIChatPromptTokens({
+            messages: messages as ChatMessage[],
+            model: this.model as OPENAI_CHAT_MODEL_NAME,
+          });
+    const fnTokens = await countTokens(tokenizer, outputSchema);
+    const costInfo =
+      this.model === "gpt-3.5-turbo-instruct"
+        ? OPENAI_TEXT_GENERATION_MODELS[this.model]
+        : OPENAI_CHAT_MODELS[this.model];
+    return {
+      prompt: promptTokens,
+      functions: fnTokens,
+      total: promptTokens + fnTokens,
+      cost: new Cost({
+        costInMillicents:
+          costInfo.promptTokenCostInMillicents * promptTokens +
+          costInfo.promptTokenCostInMillicents * fnTokens,
+        hasUnknownCost: false,
+        callsWithUnknownCost: [],
+      }),
+    };
   }
 
   private createTest = <Input extends Record<string, any>>(args: {
@@ -525,44 +576,37 @@ export class Prompt<
   };
 
   /**
-   * Basic prompt run function. Supports generating or streaming both text and structured data.
+   * Basic Swiss Army knife prompt run function.
+   * Supports generating and streaming text and structured data for OpenAI's instruct and chat models.
+   * Also supports ModelFusion's `Run` object for logging and event tracking: https://modelfusion.dev/guide/util/run
    */
   async run(args: {
     promptVariables: z.infer<InputSchema>;
     stream: true;
-    verbose?: boolean;
-    abortSignal?: AbortSignal;
+    run?: Run;
   }): Promise<
-    OutputSchema extends ZodType<infer U>
-      ? AsyncIterable<StructureStreamPart<U>>
+    OutputSchema extends z.ZodObject<any>
+      ? AsyncIterable<StructureStreamPart<z.infer<OutputSchema>>>
       : AsyncIterable<string>
   >;
   async run(args: {
     promptVariables: z.infer<InputSchema>;
     stream: false;
-    verbose?: boolean;
-    abortSignal?: AbortSignal;
-  }): Promise<OutputSchema extends ZodType<infer U> ? U : string | null>;
+    run?: Run;
+  }): Promise<
+    OutputSchema extends z.ZodObject<any>
+      ? z.infer<OutputSchema>
+      : string | null
+  >;
   async run(args: {
     promptVariables: z.infer<InputSchema>;
     stream: boolean;
-    verbose?: boolean;
-    abortSignal?: AbortSignal;
+    run?: Run;
   }): Promise<any> {
-    args.verbose = true;
     const promptVars = this.input?.parse(args.promptVariables) || {};
     const messages = this.chooseCandidatePrompt(promptVars)
       .withVariables(promptVars)
       .compile();
-    if (args.verbose) {
-      console.log("model:", this.model);
-      if (this.model === "gpt-3.5-turbo-instruct") {
-        console.log(chatMessagesToInstructPrompt({ messages }));
-      } else {
-        console.log(messages);
-      }
-    }
-
     if (!this.output || this.model === "gpt-3.5-turbo-instruct") {
       const config =
         this.model === "gpt-3.5-turbo-instruct"
@@ -570,13 +614,13 @@ export class Prompt<
               model: "gpt-3.5-turbo-instruct",
               stopSequences: this.stop,
               temperature: this.temperature,
-              maxCompletionTokens: this.max_tokens,
+              maxGenerationTokens: this.max_tokens,
             })
           : openai.ChatTextGenerator({
               model: this.model,
               stopSequences: this.stop,
               temperature: this.temperature,
-              maxCompletionTokens: this.max_tokens,
+              maxGenerationTokens: this.max_tokens,
             });
       if (args.stream) {
         const stream = await streamText(
@@ -584,7 +628,7 @@ export class Prompt<
           config instanceof OpenAICompletionModel
             ? chatMessagesToInstructPrompt({ messages })
             : messages,
-          { run: { abortSignal: args.abortSignal } }
+          { run: args.run }
         );
         return stream;
       } else {
@@ -593,7 +637,7 @@ export class Prompt<
           config instanceof OpenAICompletionModel
             ? chatMessagesToInstructPrompt({ messages })
             : messages,
-          { run: { abortSignal: args.abortSignal } }
+          { run: args.run }
         );
         return text;
       }
@@ -603,7 +647,7 @@ export class Prompt<
           model: this.model,
           stopSequences: this.stop,
           temperature: this.temperature,
-          maxCompletionTokens: this.max_tokens,
+          maxGenerationTokens: this.max_tokens,
         })
         .asFunctionCallStructureGenerationModel({
           fnName: toCamelCase(this.name),
@@ -614,7 +658,7 @@ export class Prompt<
           config,
           new ZodSchema(this.output),
           messages as OpenAIChatMessage[],
-          { run: { abortSignal: args.abortSignal } }
+          { run: args.run }
         );
         return stream;
       } else {
@@ -622,7 +666,7 @@ export class Prompt<
           config,
           new ZodSchema(this.output),
           messages as OpenAIChatMessage[],
-          { run: { abortSignal: args.abortSignal } }
+          { run: args.run }
         );
       }
     }

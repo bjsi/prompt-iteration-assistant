@@ -1,6 +1,6 @@
 {
   "name": "prompt-iteration-assistant",
-  "version": "0.0.25",
+  "version": "0.0.26",
   "description": "A set of CLI tools to help you iterate on your LLM prompts.",
   "main": "./dist/index.js",
   "types": "dist/index.d.ts",
@@ -32,7 +32,8 @@
     "json-schema-to-typescript": "^13.1.1",
     "marked": "^10.0.0",
     "marked-terminal": "^6.1.0",
-    "modelfusion": "^0.90.0",
+    "modelfusion": "^0.107.0",
+    "modelfusion-experimental": "^0.2.0",
     "openai": "^4.20.1",
     "promptfoo": "^0.31.1",
     "remeda": "^1.29.0",

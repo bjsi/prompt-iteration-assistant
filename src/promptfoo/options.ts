@@ -1,5 +1,8 @@
 import { ChatCompletionMessageParam } from "openai/resources";
-import { OPENAI_CHAT_MODEL, OPENAI_INSTRUCT_MODEL } from "../openai/models";
+import {
+  OPENAI_CHAT_MODEL_NAME,
+  OPENAI_INSTRUCT_MODEL_NAME,
+} from "../openai/models";
 
 export interface ModelParams {
   stop?: string[];
@@ -9,7 +12,7 @@ export interface ModelParams {
 
 export const plainTextTestOptions = (opts: {
   prompts: (ChatCompletionMessageParam[] | string)[];
-  model: OPENAI_CHAT_MODEL | OPENAI_INSTRUCT_MODEL;
+  model: OPENAI_CHAT_MODEL_NAME | OPENAI_INSTRUCT_MODEL_NAME;
   modelParams: ModelParams;
 }) => {
   return {
@@ -28,7 +31,7 @@ export const plainTextTestOptions = (opts: {
 export const functionCallTestOptions = (opts: {
   prompts: (ChatCompletionMessageParam[] | string)[];
   functions: any[];
-  model: OPENAI_CHAT_MODEL | OPENAI_INSTRUCT_MODEL;
+  model: OPENAI_CHAT_MODEL_NAME | OPENAI_INSTRUCT_MODEL_NAME;
   modelParams: ModelParams;
 }) => {
   return {

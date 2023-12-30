@@ -11,7 +11,7 @@ export async function generateTextConcurrently(args: {
   const { messages: initialMessages, abortSignal, numCalls: n } = args;
   const config = openai.ChatTextGenerator({
     model: "gpt-4",
-    maxCompletionTokens: 300,
+    maxGenerationTokens: 300,
   });
   const opts = {
     run: {

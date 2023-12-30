@@ -100,7 +100,6 @@ export async function getValuesForSchema<
           prompt: args.prompt || "",
         },
         stream: false,
-        verbose: true,
       });
       console.log(example);
       variables[key] = example[key];
