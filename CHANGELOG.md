@@ -1,3 +1,7 @@
+## 0.0.27
+
+- Fix small bug in `CandidatePrompt` class.
+
 ## 0.0.26
 
 - Add prompt `calculateCost` method to calculate the cost of input tokens.

@@ -108,7 +108,7 @@ export class CandidatePrompt<Variables extends {}> {
       return `\${${key.toString()}}`;
     } else {
       const value = this.variables[key];
-      if (!value) {
+      if (value === undefined) {
         throw new Error(
           `Variable ${key.toString()} not found for prompt ${this.name}`
         );
