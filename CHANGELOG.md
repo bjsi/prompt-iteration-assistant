@@ -1,3 +1,7 @@
+## 0.0.28
+
+- Try to fix calculateCost function.
+
 ## 0.0.27
 
 - Fix small bug in `CandidatePrompt` class.
