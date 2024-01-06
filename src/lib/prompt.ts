@@ -54,10 +54,10 @@ import { Cost } from "modelfusion-experimental";
 dotenv.config();
 inquirer.registerPrompt("search-list", searchlist);
 
-export type ExampleDataSet<T extends ZodType> = {
-  [key in keyof z.infer<T>]: {
+export type ExampleDataSet<T> = {
+  [key in keyof T]: {
     name: string;
-    value: z.infer<T>[key];
+    value: T[key];
   };
 };
 
@@ -121,7 +121,7 @@ export interface PromptArgs<
   /**
    * Array of example data to use in CLI runs and tests.
    */
-  exampleData?: ExampleDataSet<InputSchema>[];
+  exampleData?: ExampleDataSet<z.infer<InputSchema>>[];
   /**
    * Don't suggest example data in the CLI when picking input values.
    */
@@ -163,7 +163,7 @@ export class Prompt<
   /**
    * Array of example data to use for CLI runs or testing.
    */
-  exampleData: ExampleDataSet<InputSchema>[];
+  exampleData: ExampleDataSet<z.infer<InputSchema>>[];
   dontSuggestExampleData?: boolean | undefined;
   model: OPENAI_CHAT_MODEL_NAME | OPENAI_INSTRUCT_MODEL_NAME;
   stop?: string[] | undefined;

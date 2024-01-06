@@ -25,7 +25,7 @@ export async function getValuesForSchema<
   schema: Schema;
   prompt: string;
   existingVariables?: Partial<z.infer<Schema>>;
-  exampleData?: ExampleDataSet<Schema>[];
+  exampleData?: ExampleDataSet<z.infer<Schema>>[];
   formatKey?: (key: keyof z.infer<Schema>) => string;
 }) {
   console.clear();

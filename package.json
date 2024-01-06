@@ -1,6 +1,6 @@
 {
   "name": "prompt-iteration-assistant",
-  "version": "0.0.28",
+  "version": "0.0.29",
   "description": "A set of CLI tools to help you iterate on your LLM prompts.",
   "main": "./dist/index.js",
   "types": "dist/index.d.ts",

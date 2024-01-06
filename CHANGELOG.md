@@ -1,3 +1,7 @@
+## 0.0.29
+
+- Change `ExampleDataset` generic param to a normal type instead of a Zod schema.
+
 ## 0.0.28
 
 - Try to fix calculateCost function.
