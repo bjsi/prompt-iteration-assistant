@@ -248,7 +248,7 @@ export class Prompt<
     name: string;
     vars: Input;
     onlyTestMainPrompt?: boolean;
-    customRunFunction?: (vars: Input) => Promise<string | object | undefined>;
+    customRunFunction?: (vars: Input) => Promise<any>;
     assertions: ((
       output: OutputSchema extends ZodType<infer U> ? U : string | null
     ) => {
@@ -325,7 +325,7 @@ export class Prompt<
 
   withCustomTest = <
     Input extends Record<string, string | object>,
-    Output extends string | object | undefined
+    Output extends any
   >(
     opts: {
       name: string;

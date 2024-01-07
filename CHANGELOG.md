@@ -1,3 +1,7 @@
+## 0.0.31
+
+- Fix `withCustomTest` output generic parameter.
+
 ## 0.0.29
 
 - Change `ExampleDataset` generic param to a normal type instead of a Zod schema.
