@@ -244,11 +244,14 @@ export class Prompt<
     };
   }
 
-  private createTest = <Input extends Record<string, any>>(args: {
+  private createTest = <
+    Input extends Record<string, any>,
+    CustomFn extends ((vars: Input) => Promise<any>) | undefined
+  >(args: {
     name: string;
     vars: Input;
     onlyTestMainPrompt?: boolean;
-    customRunFunction?: (vars: Input) => Promise<any>;
+    customRunFunction?: CustomFn;
     assertions: ((
       output: OutputSchema extends ZodType<infer U> ? U : string | null
     ) => {
@@ -330,7 +333,7 @@ export class Prompt<
       onlyTestMainPrompt?: boolean;
     },
     fn: (this: typeof this, args: Input) => Promise<Output>,
-    ...assertions: ((output: Output) => {
+    ...assertions: ((output: string) => {
       pass: boolean;
       score: number;
       reason: string;
