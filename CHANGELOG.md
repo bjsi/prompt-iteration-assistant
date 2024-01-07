@@ -1,3 +1,7 @@
+## 0.0.32
+
+- Fix `withCustomTest` assertions failing.
+
 ## 0.0.31
 
 - Fix `withCustomTest` output generic parameter.

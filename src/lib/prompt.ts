@@ -302,14 +302,8 @@ export class Prompt<
           vars: args.vars,
           assert: [
             ...defaultAsserts,
-            ...(this.output
-              ? args.assertions.map((a) =>
-                  assertJSON(
-                    // @ts-ignore
-                    this.output!,
-                    a
-                  )
-                )
+            ...(this.output && !args.customRunFunction
+              ? args.assertions.map((a) => assertJSON(this.output!, a))
               : args.assertions.map((a) => ({
                   type: "javascript" as const,
                   value: (output: string) => {
