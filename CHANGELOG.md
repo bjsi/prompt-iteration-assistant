@@ -1,3 +1,7 @@
+## 0.0.33
+
+- Fix `withCustomTest` assertions failing (again).
+
 ## 0.0.32
 
 - Fix `withCustomTest` assertions failing.

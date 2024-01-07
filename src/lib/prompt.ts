@@ -293,7 +293,10 @@ export class Prompt<
           modelParams,
         });
 
-    const defaultAsserts = this.output ? [assertValidSchema(this.output)] : [];
+    const defaultAsserts =
+      this.output && !args.customRunFunction
+        ? [assertValidSchema(this.output)]
+        : [];
     const test: promptfoo.EvaluateTestSuite = {
       ...options,
       description: args.name,
